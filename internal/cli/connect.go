@@ -1,0 +1,689 @@
+package cli
+
+import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"github.com/spf13/cobra"
+	"github.com/vincentsch/mailmd/internal/accounts"
+	"github.com/vincentsch/mailmd/internal/auth"
+	"github.com/vincentsch/mailmd/internal/backend"
+	"github.com/vincentsch/mailmd/internal/backend/imap"
+	"github.com/vincentsch/mailmd/internal/presets"
+	mdsync "github.com/vincentsch/mailmd/internal/sync"
+	rg "github.com/vincentsch/rungrad"
+	"github.com/vincentsch/rungrad/output"
+	"golang.org/x/term"
+)
+
+// ConnectResult is the JSON result of the connect commands.
+type ConnectResult struct {
+	Schema   string `json:"schema"`
+	Account  string `json:"account"`
+	Backend  string `json:"backend"`
+	Provider string `json:"provider"`
+	Address  string `json:"address"`
+	Archive  string `json:"archive"`
+	DryRun   bool   `json:"dry_run"`
+	// Folders counts the folders found on the server. LeftOut names those a
+	// sync leaves out by default.
+	Folders int      `json:"folders"`
+	LeftOut []string `json:"left_out"`
+	Next    string   `json:"next"`
+	// Note is a provider-specific remark, such as Gmail's All Mail folder.
+	Note string `json:"note,omitempty"`
+}
+
+func (m module) connectCommands(commands map[string]*rg.Command) {
+	imapCmd := commands["connect imap"]
+	imapCmd.Configure = func(c *cobra.Command) {
+		c.Flags().String("email", "", "Your email address. mailmd fills in the server settings of known providers")
+		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: from the provider or address)")
+		c.Flags().String("host", "", "IMAP server, like imap.example.com")
+		c.Flags().Int("port", 0, "IMAP port (default: 993, or 143 with --tls starttls)")
+		c.Flags().String("username", "", "Login name (default: the email address)")
+		c.Flags().String("tls", "implicit", "How to encrypt the connection: implicit or starttls")
+		c.Flags().Bool("password-stdin", false, "Read the password from the first line of standard input")
+		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
+		addFilterFlags(c)
+	}
+	imapCmd.Run = m.connectIMAP
+
+	gmailCmd := commands["connect gmail"]
+	gmailCmd.Configure = func(c *cobra.Command) {
+		c.Flags().String("client-secret", "", "The OAuth client JSON file you downloaded from Google Cloud (not needed to connect an account again)")
+		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: gmail)")
+		c.Flags().Bool("no-browser", false, "Don't open a browser, only print the sign-in address")
+		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
+		addFilterFlags(c)
+	}
+	gmailCmd.Run = m.connectGmail
+
+	outlookCmd := commands["connect outlook"]
+	outlookCmd.Configure = func(c *cobra.Command) {
+		c.Flags().String("client-id", "", "The application (client) ID of your Microsoft app registration (not needed to connect an account again)")
+		c.Flags().String("tenant", "common", "Who can sign in: common, organizations, consumers, or your tenant ID")
+		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: outlook)")
+		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
+		addFilterFlags(c)
+	}
+	outlookCmd.Run = m.connectOutlook
+}
+
+// interactive reports whether connect may ask questions.
+func (m module) interactive(f *rg.Factory) bool {
+	if f.Flags != nil && (f.Flags.NoPrompt || f.Flags.JSON || f.Flags.JQ != "" || f.Flags.Template != "") {
+		return false
+	}
+	if m.opts.Interactive != nil {
+		return *m.opts.Interactive
+	}
+	return isTerminal(f.Stdin) && isTerminal(f.Stderr)
+}
+
+// asker reads answers from stdin, one line each.
+type asker struct {
+	ctx context.Context
+	in  *bufio.Reader
+	out io.Writer
+}
+
+func (a *asker) ask(question, fallback string) (string, error) {
+	if fallback != "" {
+		fmt.Fprintf(a.out, "%s [%s]: ", question, fallback)
+	} else {
+		fmt.Fprintf(a.out, "%s: ", question)
+	}
+	line, err := readLine(a.ctx, a.in)
+	if a.ctx.Err() != nil {
+		fmt.Fprintln(a.out)
+		return "", a.ctx.Err()
+	}
+	if err != nil && (line == "" || !errors.Is(err, io.EOF)) {
+		return "", newUserError(rg.ExitUsage, "No answer was given", "")
+	}
+	if answer := strings.TrimSpace(line); answer != "" {
+		return answer, nil
+	}
+	return fallback, nil
+}
+
+// readLine reads one line, but returns as soon as ctx ends, so Ctrl-C works
+// at a prompt. The read goes on in the background until the program ends.
+func readLine(ctx context.Context, in *bufio.Reader) (string, error) {
+	type answer struct {
+		line string
+		err  error
+	}
+	done := make(chan answer, 1)
+	go func() {
+		line, err := in.ReadString('\n')
+		done <- answer{line, err}
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case a := <-done:
+		return a.line, a.err
+	}
+}
+
+// connectOptions are the settings every connect command shares.
+type connectOptions struct {
+	root    string
+	archive string
+	filter  mdsync.Filter
+	since   string
+}
+
+func (m module) readConnectOptions(c *cobra.Command) (connectOptions, error) {
+	root, err := configRoot(c)
+	if err != nil {
+		return connectOptions{}, err
+	}
+	opts := connectOptions{root: root, since: flagString(c, "since")}
+	if out := flagString(c, "out"); out != "" {
+		if opts.archive, err = absPath(out, m.home()); err != nil {
+			return connectOptions{}, err
+		}
+	}
+	opts.filter = mdsync.Filter{Folders: flagStrings(c, "folder"), Exclude: flagStrings(c, "exclude")}
+	if err := opts.filter.Validate(); err != nil {
+		return connectOptions{}, newUserError(rg.ExitUsage, upperFirst(err.Error()), "")
+	}
+	if _, err := mdsync.ParseSince(opts.since, m.opts.Clock()); err != nil {
+		return connectOptions{}, newUserError(rg.ExitUsage, upperFirst(err.Error()), "")
+	}
+	return opts, nil
+}
+
+// imapSettings collects the IMAP settings from flags, presets and prompts.
+type imapSettings struct {
+	account, email, host, username, tls string
+	port                                int
+	preset                              presets.Preset
+	known                               bool
+}
+
+func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) error {
+	if err := checkGlobals(f); err != nil {
+		return err
+	}
+	opts, err := m.readConnectOptions(c)
+	if err != nil {
+		return err
+	}
+	registry, err := accounts.Load(opts.root)
+	if err != nil {
+		return registryError(err)
+	}
+	interactive := m.interactive(f)
+	ask := &asker{ctx: c.Context(), in: bufio.NewReader(f.Stdin), out: f.Stderr}
+	s, err := m.imapSettings(c, registry, interactive, ask)
+	if err != nil {
+		return connectError(err, "imap")
+	}
+
+	// Everything else is checked. Only now mailmd asks for the password.
+	if s.known && s.preset.Password != "" && interactive {
+		fmt.Fprintln(f.Stderr, s.preset.Password)
+	}
+	password, err := m.readPassword(f, c, s)
+	if err != nil {
+		return connectError(err, "imap")
+	}
+	f.RegisterSecret(password)
+
+	cfg := imap.Config{Host: s.host, Port: s.port, Username: s.username, Password: password, TLSMode: imap.TLSMode(s.tls), RootCAs: m.opts.RootCAs}
+	if flagBool(c, "verbose") {
+		cfg.Log = f.Stderr
+	}
+	settings := accounts.Settings{Host: s.host, Port: s.port, Username: s.username, TLSMode: s.tls}
+	// IMAP has no way to ask for the address. A login name without an @
+	// says nothing about it, so the address stays empty then.
+	email := s.email
+	if email == "" && strings.Contains(s.username, "@") {
+		email = s.username
+	}
+	var folders []backend.Folder
+	probe := func(ctx context.Context, stage string) (accounts.Settings, string, error) {
+		if err := accounts.StoreIMAPCredential(opts.root, stage, password); err != nil {
+			return settings, "", err
+		}
+		account := accounts.AccountConfig{Name: s.account, Backend: "imap", ArchiveDir: stage, CredentialRef: stage + "/imap.json", Settings: settings}
+		folders, _, err = m.probe(ctx, account, accounts.OpenOptions{ConfigRoot: opts.root, RootCAs: m.opts.RootCAs, Log: cfg.Log})
+		var u *userError
+		if err == nil && errors.As(checkFolders(opts, account, folders), &u) {
+			// A typo in --folder stops connect before anything is saved.
+			// Fixing it costs only the password prompt again.
+			u.info.Message = strings.TrimSuffix(u.info.Message, ".") + ". Nothing was saved."
+			u.info.Hint = strings.TrimSuffix(u.info.Hint, ".") + ". Run the connect command again with the right folder."
+			return settings, email, u
+		}
+		return settings, email, err
+	}
+	if f.DryRun() {
+		b, err := imap.Open(c.Context(), cfg)
+		if err != nil {
+			return connectError(err, "imap")
+		}
+		folders, err = b.Folders(c.Context())
+		_ = b.Close()
+		if err != nil {
+			return connectError(err, "imap")
+		}
+		account, err := plannedAccount(opts.root, s.account, "imap")
+		if err != nil {
+			return err
+		}
+		account.Settings, account.Email = settings, email
+		if err := checkFolders(opts, account, folders); err != nil {
+			return err
+		}
+		return m.writeConnect(f, c, account, opts, folders, true)
+	}
+	account, err := accounts.Connect(c.Context(), opts.root, s.account, "imap", probe, m.opts.ConnectHooks)
+	if err != nil {
+		return connectError(err, "imap")
+	}
+	return m.finishConnect(f, c, account, opts, folders)
+}
+
+func (m module) imapSettings(c *cobra.Command, registry accounts.Registry, interactive bool, ask *asker) (imapSettings, error) {
+	s := imapSettings{
+		account:  strings.TrimSpace(flagString(c, "account")),
+		email:    strings.TrimSpace(flagString(c, "email")),
+		host:     strings.TrimSpace(flagString(c, "host")),
+		username: strings.TrimSpace(flagString(c, "username")),
+		tls:      strings.ToLower(strings.TrimSpace(flagString(c, "tls"))),
+	}
+	s.port, _ = c.Flags().GetInt("port")
+	// Connecting an existing account again, for a new password, needs only
+	// its name. The saved settings fill in the rest.
+	if old, err := registry.Find(s.account); err == nil && s.account != "" && old.Backend == "imap" && s.email == "" && s.host == "" && s.username == "" {
+		s.account, s.host, s.username = old.Name, old.Settings.Host, old.Settings.Username
+		if s.port == 0 {
+			s.port = old.Settings.Port
+		}
+		if !c.Flags().Changed("tls") {
+			s.tls = old.Settings.TLSMode
+		}
+		s.email = old.Email
+		s.preset, s.known = presets.ForHost(s.host)
+		return s, nil
+	}
+	if s.tls != "implicit" && s.tls != "starttls" {
+		return s, newUserError(rg.ExitUsage, fmt.Sprintf("--tls must be implicit or starttls, not %q", s.tls), "Most servers use implicit TLS on port 993.")
+	}
+	if s.port < 0 || s.port > 65535 {
+		return s, newUserError(rg.ExitUsage, "--port must be between 1 and 65535", "")
+	}
+	var err error
+	if interactive && s.email == "" && s.host == "" {
+		if s.email, err = ask.ask("Email address", ""); err != nil {
+			return s, err
+		}
+	}
+	if s.email != "" && !strings.Contains(s.email, "@") {
+		return s, newUserError(rg.ExitUsage, fmt.Sprintf("%q is not an email address", s.email), "")
+	}
+	if s.preset, s.known = presets.ForEmail(s.email); !s.known && s.host != "" {
+		s.preset, s.known = presets.ForHost(s.host)
+	}
+	if s.known && s.preset.UseOutlook {
+		return s, newUserError(rg.ExitUsage,
+			"Microsoft no longer accepts passwords over IMAP for Outlook.com and most Microsoft 365 mailboxes",
+			"Connect it through Microsoft Graph instead: mailmd connect outlook --client-id YOUR-APP-ID. The Outlook guide shows how to get the ID: https://github.com/vincentsch/mailmd/blob/main/docs/outlook.md")
+	}
+	if s.host == "" && s.known {
+		s.host = s.preset.Host
+		if !c.Flags().Changed("tls") {
+			s.tls = s.preset.TLS
+		}
+		if s.port == 0 {
+			s.port = s.preset.Port
+		}
+	}
+	if s.host == "" && interactive {
+		if s.host, err = ask.ask("IMAP server (like imap.example.com)", guessHost(s.email)); err != nil {
+			return s, err
+		}
+	}
+	if s.username == "" {
+		s.username = s.email
+	}
+	if s.username == "" && interactive {
+		if s.username, err = ask.ask("Login name", ""); err != nil {
+			return s, err
+		}
+	}
+	var missing []string
+	if s.host == "" {
+		missing = append(missing, "--host")
+	}
+	if s.username == "" {
+		missing = append(missing, "--username")
+	}
+	if len(missing) > 0 {
+		return s, newUserError(rg.ExitUsage, "Missing "+strings.Join(missing, " and "),
+			"Give your email address, and mailmd fills in the settings of known providers: mailmd connect imap --email you@example.com. For other servers, also add --host imap.example.com.")
+	}
+	if s.port == 0 {
+		s.port = imap.DefaultPort(imap.TLSMode(s.tls))
+	}
+	if s.account == "" {
+		s.account = defaultAccountName(registry, s)
+		if interactive {
+			if s.account, err = ask.ask("Account name", s.account); err != nil {
+				return s, err
+			}
+		}
+	}
+	if old, err := registry.Find(s.account); err == nil && old.Backend != "imap" {
+		return s, newUserError(rg.ExitUsage, fmt.Sprintf("The account %s already exists and uses %s", old.Name, providerName(old.Backend)), "Choose another name with --account.")
+	}
+	return s, nil
+}
+
+// guessHost suggests imap.<domain> for an unknown provider.
+func guessHost(email string) string {
+	if _, domain, ok := strings.Cut(email, "@"); ok && domain != "" {
+		return "imap." + domain
+	}
+	return ""
+}
+
+// defaultAccountName picks a short name like "gmail" or "example". It reuses
+// the name of an existing account for the same login, so connecting again
+// refreshes it.
+func defaultAccountName(r accounts.Registry, s imapSettings) string {
+	base := ""
+	address := s.email
+	if address == "" {
+		address = s.username
+	}
+	switch {
+	case s.known:
+		base = s.preset.Short
+	case strings.Contains(address, "@"):
+		_, domain, _ := strings.Cut(address, "@")
+		base, _, _ = strings.Cut(domain, ".")
+	default:
+		base, _, _ = strings.Cut(s.host, ".")
+		if base == "imap" || base == "mail" {
+			parts := strings.Split(s.host, ".")
+			if len(parts) > 1 {
+				base = parts[1]
+			}
+		}
+	}
+	if base == "" {
+		base = "mail"
+	}
+	for _, a := range r.Accounts {
+		if a.Backend == "imap" && strings.EqualFold(a.Settings.Host, s.host) && a.Settings.Username == s.username {
+			return a.Name
+		}
+	}
+	name := base
+	for i := 2; ; i++ {
+		if _, err := r.Find(name); err != nil {
+			return name
+		}
+		name = base + "-" + strconv.Itoa(i)
+	}
+}
+
+func (m module) readPassword(f *rg.Factory, c *cobra.Command, s imapSettings) (string, error) {
+	if flagBool(c, "password-stdin") {
+		password, err := readPasswordLine(f.Stdin)
+		if err != nil {
+			return "", newUserError(rg.ExitUsage, "Cannot read the password from stdin: "+err.Error(), "")
+		}
+		return password, nil
+	}
+	if password := m.opts.Getenv("MAILMD_IMAP_PASSWORD"); password != "" {
+		return password, nil
+	}
+	canPrompt := isTerminal(f.Stdin)
+	if m.opts.Interactive != nil {
+		canPrompt = *m.opts.Interactive
+	}
+	if !canPrompt || f.Flags != nil && f.Flags.NoPrompt {
+		return "", newUserError(rg.ExitUsage, "No password was given",
+			"Pipe it in with --password-stdin, or set MAILMD_IMAP_PASSWORD. In a terminal, mailmd asks for it.")
+	}
+	password, err := m.opts.PasswordPrompt(c.Context(), f.Stdin, f.Stderr, "Password for "+s.username)
+	if c.Context().Err() != nil {
+		return "", c.Context().Err()
+	}
+	if err != nil {
+		return "", newUserError(rg.ExitUsage, "No password was given", "")
+	}
+	return password, nil
+}
+
+// probe opens the new account from its temporary folder and lists the
+// mailbox folders. So connect saves only a login that works. It also asks
+// for the mailbox's address, where the provider tells it.
+func (m module) probe(ctx context.Context, a accounts.AccountConfig, o accounts.OpenOptions) ([]backend.Folder, string, error) {
+	o.HTTPClient, o.Clock, o.GraphBaseURL, o.IdentityBaseURL = m.opts.HTTPClient, m.opts.Clock, m.opts.GraphBaseURL, m.opts.IdentityBaseURL
+	b, err := m.opts.Open(ctx, a, o)
+	if err != nil {
+		return nil, "", errors.Join(err, backend.Close(b))
+	}
+	if b == nil {
+		return nil, "", errors.New("the provider returned no connection")
+	}
+	folders, err := b.Folders(ctx)
+	address := ""
+	if asker, ok := b.(backend.Addresser); ok && err == nil {
+		// The account works without its address, so a failure here only
+		// leaves the address empty.
+		address, _ = asker.Address(ctx)
+		address = cleanAddress(address)
+	}
+	return folders, address, errors.Join(err, backend.Close(b))
+}
+
+// cleanAddress keeps an address from the provider only when it looks like
+// one, so a status line never shows something odd.
+func cleanAddress(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.Contains(s, "@") || len(s) > 320 || strings.ContainsFunc(s, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+		return ""
+	}
+	return s
+}
+
+// checkFolders makes sure each --folder pattern matches a folder, so a typo
+// is not saved.
+func checkFolders(opts connectOptions, a accounts.AccountConfig, folders []backend.Folder) error {
+	err := opts.filter.CheckMatches(folders)
+	if err == nil {
+		return nil
+	}
+	return &userError{code: rg.ExitUsage, info: mdsync.Describe(err, a)}
+}
+
+// finishConnect saves the archive folder and filters, then prints the result.
+func (m module) finishConnect(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, folders []backend.Folder) error {
+	if err := checkFolders(opts, a, folders); err != nil {
+		var u *userError
+		errors.As(err, &u)
+		// The login is saved at this point, but no setting of this command
+		// is, so a sync doesn't run with half of them.
+		u.info.Message = fmt.Sprintf("Connected %s, but %s mailmd saved only the login and none of the settings of this command, like --folder or --out", a.Name, lowerFirst(u.info.Message))
+		u.info.Hint += ". Run the connect command again with the right folder."
+		return u
+	}
+	if opts.archive != "" || len(opts.filter.Folders) > 0 || len(opts.filter.Exclude) > 0 || opts.since != "" || c.Flags().Changed("keep-raw") || c.Flags().Changed("prefer-text") {
+		updated, err := accounts.Update(opts.root, a.Name, func(acc *accounts.AccountConfig) {
+			if opts.archive != "" {
+				acc.Root = opts.archive
+			}
+			if c.Flags().Changed("folder") || c.Flags().Changed("exclude") {
+				acc.Folders, acc.Exclude = opts.filter.Folders, opts.filter.Exclude
+			}
+			if c.Flags().Changed("since") {
+				acc.Since = opts.since
+			}
+			if c.Flags().Changed("keep-raw") {
+				acc.KeepRaw = flagBool(c, "keep-raw")
+			}
+			if c.Flags().Changed("prefer-text") {
+				acc.PreferText = flagBool(c, "prefer-text")
+			}
+		})
+		if err != nil {
+			return newUserError(rg.ExitAPI, "The account was connected, but its settings could not be saved", "Run the same connect command again.")
+		}
+		a = updated
+	}
+	return m.writeConnect(f, c, a, opts, folders, false)
+}
+
+func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, folders []backend.Folder, dry bool) error {
+	root := opts.archive
+	if root == "" {
+		root = a.Root
+	}
+	if root == "" {
+		root, _ = m.defaultRoot()
+	}
+	filter := mdsync.Filter{Folders: a.Folders, Exclude: a.Exclude}
+	if len(opts.filter.Folders) > 0 || len(opts.filter.Exclude) > 0 {
+		filter = opts.filter
+	}
+	result := ConnectResult{
+		Schema: "mailmd-connect/1", Account: a.Name, Backend: a.Backend, Provider: providerName(a.Backend),
+		Address: a.Email, Archive: filepath.Join(root, a.ArchiveDir), DryRun: dry, LeftOut: []string{},
+		Next: "mailmd sync " + a.Name,
+	}
+	filter = filter.ForFolders(folders)
+	for _, folder := range folders {
+		if !folder.Fetchable {
+			continue
+		}
+		result.Folders++
+		if out, _ := filter.Excludes(folder.Path, folder.Role); out {
+			result.LeftOut = append(result.LeftOut, folder.Path)
+		}
+	}
+	allMail := filter.GmailAllMail()
+	if allMail != "" {
+		result.Note = "Gmail has every message once in " + allMail + ", including archived mail, so mailmd syncs only that folder. " +
+			"The files won't list Gmail's labels. If you want the labels, use mailmd connect gmail instead."
+	}
+	home := m.home()
+	render := func(w io.Writer) {
+		if dry {
+			fmt.Fprintf(w, "The login works. Nothing was saved because of --dry-run.\n")
+		} else {
+			who := result.Provider
+			if result.Address != "" {
+				who = result.Address
+			}
+			fmt.Fprintf(w, "Connected %s (%s).\n", a.Name, who)
+		}
+		if result.Folders > 0 {
+			line := fmt.Sprintf("The mailbox has %s.", plural(result.Folders, "folder", "folders"))
+			if len(result.LeftOut) > 0 && allMail == "" {
+				line += fmt.Sprintf(" A sync leaves out %s.", joinNames(result.LeftOut))
+			}
+			fmt.Fprintln(w, line)
+		}
+		if result.Note != "" {
+			fmt.Fprintln(w, result.Note)
+		}
+		fmt.Fprintf(w, "Mail goes to %s.\n", shortPath(result.Archive, home))
+		if !dry {
+			fmt.Fprintf(w, "\nNext: %s\n", result.Next)
+		}
+	}
+	return f.WriteOutput(rg.Output{Model: result, Human: render, Plain: render, Meta: output.Meta{Extra: map[string]any{"command": c.CommandPath()}}})
+}
+
+// connectError explains a failed connect.
+func connectError(err error, kind string) error {
+	var u *userError
+	if errors.As(err, &u) {
+		return err
+	}
+	if errors.Is(err, context.Canceled) {
+		return &userError{code: rg.ExitAPI, info: mdsync.ErrorInfo{Category: mdsync.CategoryCanceled, Message: "Canceled. Nothing was saved"}}
+	}
+	var problem *backend.Problem
+	if errors.As(err, &problem) {
+		return &userError{code: exitCode(mdsync.Category(err)), info: mdsync.ErrorInfo{Category: mdsync.Category(err), Message: problem.Text, Hint: problem.Hint}}
+	}
+	text := err.Error()
+	for _, prefix := range []string{"imap: invalid config: ", "auth: invalid options: ", "auth: invalid oauth client: ", "auth: oauth setup failed: "} {
+		text = strings.TrimPrefix(text, prefix)
+	}
+	switch {
+	case errors.Is(err, accounts.ErrKindMismatch):
+		return newUserError(rg.ExitUsage, "An account with this name already exists and uses another provider", "Choose another name with --account.")
+	case errors.Is(err, imap.ErrInvalidConfig), errors.Is(err, auth.ErrInvalidOptions):
+		return newUserError(rg.ExitUsage, upperFirst(text), "")
+	case errors.Is(err, auth.ErrNoClientSecret):
+		return newUserError(rg.ExitUsage, upperFirst(text),
+			"Google shows the client secret only once, right after you create the client. Create a new client of the type \"Desktop app\" and click \"Download JSON\" in the dialog that opens. The Gmail guide shows each step: https://github.com/vincentsch/mailmd/blob/main/docs/gmail.md")
+	case errors.Is(err, auth.ErrInvalidOAuthClient):
+		return newUserError(rg.ExitUsage, upperFirst(text),
+			"In Google Cloud, create an OAuth client of the type \"Desktop app\" and download its JSON file. The Gmail guide shows each step: https://github.com/vincentsch/mailmd/blob/main/docs/gmail.md")
+	case errors.Is(err, auth.ErrOAuthSetup):
+		return newUserError(rg.ExitAuth, "The sign-in did not finish: "+text, "Run the connect command again.")
+	}
+	info := mdsync.Describe(err, accounts.AccountConfig{Backend: kind})
+	if info.Category == mdsync.CategoryAuth {
+		// Describe words this for a saved login that stopped working. Here
+		// the first sign-in failed, and the account has no name yet.
+		info.Message = map[string]string{"gmail": "Google", "graph": "Microsoft"}[kind] + " did not accept the sign-in."
+		info.Hint = "Check that you signed in with the right account, then run the connect command again."
+	}
+	return &userError{code: exitCode(info.Category), info: info}
+}
+
+func upperFirst(s string) string {
+	if s == "" || strings.HasPrefix(s, "--") {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+func readPasswordLine(r io.Reader) (string, error) {
+	var b []byte
+	one := make([]byte, 1)
+	for len(b) <= 65536 {
+		n, err := r.Read(one)
+		if n > 0 {
+			if one[0] == '\n' {
+				break
+			}
+			b = append(b, one[0])
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(b) > 65536 {
+		return "", errors.New("the password is too long")
+	}
+	s := strings.TrimSuffix(string(b), "\r")
+	if s == "" {
+		return "", errors.New("the first line is empty")
+	}
+	return s, nil
+}
+
+func hiddenPassword(ctx context.Context, r io.Reader, w io.Writer, label string) (string, error) {
+	file, ok := r.(*os.File)
+	if !ok || !term.IsTerminal(int(file.Fd())) {
+		return "", errors.New("stdin is not a terminal")
+	}
+	fd := int(file.Fd())
+	state, err := term.GetState(fd)
+	if err != nil {
+		return "", err
+	}
+	fmt.Fprintf(w, "%s (hidden): ", label)
+	type answer struct {
+		password []byte
+		err      error
+	}
+	done := make(chan answer, 1)
+	go func() {
+		b, err := term.ReadPassword(fd)
+		done <- answer{b, err}
+	}()
+	var a answer
+	select {
+	case <-ctx.Done():
+		// On Ctrl-C, the terminal shows typed text again before mailmd
+		// stops.
+		_ = term.Restore(fd, state)
+		fmt.Fprintln(w)
+		return "", ctx.Err()
+	case a = <-done:
+	}
+	fmt.Fprintln(w)
+	if a.err != nil {
+		return "", a.err
+	}
+	if len(a.password) == 0 {
+		return "", errors.New("empty password")
+	}
+	return string(a.password), nil
+}
