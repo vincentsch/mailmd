@@ -207,9 +207,11 @@ var specs = []spec{
 		modes:    allModes,
 	},
 	{
-		path:    "list",
-		short:   "List connected accounts",
-		related: []string{"status"},
+		path:     "list",
+		short:    "List parts of your mailmd setup",
+		long:     "Show parts of your mailmd setup. Run mailmd list accounts to see your connected accounts with their provider and archive folder.",
+		examples: []string{"mailmd list accounts"},
+		related:  []string{"status"},
 	},
 	{
 		path:     "list accounts",

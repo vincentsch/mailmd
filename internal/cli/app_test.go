@@ -445,6 +445,22 @@ func TestGeneratedDocumentationMatchesCatalog(t *testing.T) {
 	}
 }
 
+// The command reference and the website list every command with its one-line
+// help, so two commands with the same line look like a mistake.
+func TestEveryCommandHasItsOwnOneLineHelp(t *testing.T) {
+	seen := map[string]string{}
+	for _, s := range specs {
+		if other, ok := seen[s.short]; ok {
+			t.Errorf("%q and %q both have the one-line help %q", other, s.path, s.short)
+		}
+		seen[s.short] = s.path
+	}
+	_, help, _ := invoke(t, Options{ConfigRoot: t.TempDir()}, "", "list", "--help")
+	if !strings.Contains(help, "mailmd list accounts") {
+		t.Fatalf("list help doesn't point to list accounts:\n%s", help)
+	}
+}
+
 func TestOfflineConformance(t *testing.T) {
 	root, out := t.TempDir(), t.TempDir()
 	for _, name := range []string{"fixture", "forbidden", "broken"} {
