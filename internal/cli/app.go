@@ -178,6 +178,19 @@ var specs = []spec{
 		mutates: true,
 	},
 	{
+		path:  "disconnect",
+		short: "Remove an account and its saved login",
+		long: "Remove a connected account. mailmd deletes its saved login and the record of its last sync from your config folder. " +
+			"The archive stays as it is, with all its files.\n\n" +
+			"For Gmail and Outlook, your Google or Microsoft account still lists the app you signed in with until you remove it there. mailmd tells you where.\n\n" +
+			"Use --dry-run to see what mailmd would delete.",
+		examples: []string{"mailmd disconnect work --dry-run", "mailmd disconnect work"},
+		related:  []string{"connect", "list accounts"},
+		schema:   "mailmd-disconnect/1",
+		modes:    simpleModes,
+		mutates:  true,
+	},
+	{
 		path:  "sync",
 		short: "Copy new mail into the archive",
 		long: "Copy the new mail of your connected accounts into Markdown files. Without account names, mailmd syncs all accounts. " +
@@ -280,6 +293,7 @@ func (m module) Commands() []*rg.Command {
 		}
 	}
 	m.connectCommands(commands)
+	m.disconnectCommand(commands["disconnect"])
 	m.syncCommand(commands["sync"])
 	m.statusCommand(commands["status"])
 	m.listAccountsCommand(commands["list accounts"])
@@ -287,7 +301,7 @@ func (m module) Commands() []*rg.Command {
 	m.updateCommand(commands["update"])
 	commands["connect"].AddCommand(commands["connect imap"], commands["connect gmail"], commands["connect outlook"])
 	commands["list"].AddCommand(commands["list accounts"])
-	return []*rg.Command{commands["connect"], commands["sync"], commands["status"], commands["list"], commands["demo"], commands["update"]}
+	return []*rg.Command{commands["connect"], commands["disconnect"], commands["sync"], commands["status"], commands["list"], commands["demo"], commands["update"]}
 }
 
 func lastWord(path string) string {

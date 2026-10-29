@@ -175,3 +175,75 @@ func TestRegistryRejectsCorruptionAndBackendChangeBeforeSetup(t *testing.T) {
 		t.Fatal("corruption accepted")
 	}
 }
+
+func TestRemoveDeletesOnlyThatAccountsFiles(t *testing.T) {
+	root := t.TempDir()
+	ctx := context.Background()
+	for _, name := range []string{"work", "home"} {
+		a, e := Connect(ctx, root, name, "mock", mockSetup(root, "secret-"+name), privatefs.Hooks{})
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = SaveLastSync(root, a, LastSync{Outcome: "completed"}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	workDir := filepath.Join(root, "mailmd", "work")
+	want := []string{filepath.Join(workDir, "mock.json"), filepath.Join(workDir, "last-sync.json")}
+	registry, _ := os.ReadFile(filepath.Join(root, "mailmd", "accounts.json"))
+
+	// A dry run names the files and changes nothing.
+	a, files, e := Remove(root, "WORK", true)
+	if e != nil || a.Name != "work" || !reflect.DeepEqual(files, want) {
+		t.Fatalf("dry run = %+v %v %v", a, files, e)
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, "mailmd", "accounts.json")); string(after) != string(registry) {
+		t.Fatal("dry run changed accounts.json")
+	}
+	for _, path := range want {
+		if _, e := os.Stat(path); e != nil {
+			t.Fatalf("dry run deleted %s", path)
+		}
+	}
+
+	_, files, e = Remove(root, "work", false)
+	if e != nil || !reflect.DeepEqual(files, want) {
+		t.Fatalf("remove = %v %v", files, e)
+	}
+	if _, e := os.Lstat(workDir); !os.IsNotExist(e) {
+		t.Fatalf("the account's folder is still there: %v", e)
+	}
+	r, e := Load(root)
+	if e != nil || len(r.Accounts) != 1 || r.Accounts[0].Name != "home" {
+		t.Fatalf("registry after remove = %+v %v", r, e)
+	}
+	if data, e := os.ReadFile(filepath.Join(root, "mailmd", "home", "mock.json")); e != nil || string(data) != "secret-home" {
+		t.Fatalf("the other account's login changed: %q %v", data, e)
+	}
+	if _, ok := LoadLastSync(root, r.Accounts[0]); !ok {
+		t.Fatal("the other account's last sync is gone")
+	}
+
+	if _, _, e = Remove(root, "work", false); !errors.Is(e, ErrNotFound) {
+		t.Fatalf("removing it again = %v", e)
+	}
+}
+
+// A login file that is already gone, for example because the user deleted it
+// by hand, doesn't stop the account from being removed.
+func TestRemoveWorksWithoutALoginFile(t *testing.T) {
+	root := t.TempDir()
+	if _, e := Connect(context.Background(), root, "work", "mock", mockSetup(root, "secret"), privatefs.Hooks{}); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Remove(filepath.Join(root, "mailmd", "work", "mock.json")); e != nil {
+		t.Fatal(e)
+	}
+	_, files, e := Remove(root, "work", false)
+	if e != nil || len(files) != 0 {
+		t.Fatalf("remove = %v %v", files, e)
+	}
+	if r, _ := Load(root); len(r.Accounts) != 0 {
+		t.Fatalf("still listed: %+v", r.Accounts)
+	}
+}

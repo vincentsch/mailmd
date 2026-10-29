@@ -106,6 +106,13 @@ the user types the new password. For Gmail and Outlook, it is
 `mailmd connect outlook --account <name>`. mailmd uses the client it saved,
 so the user needs no client file or client ID for that.
 
+When the user wants to remove an account, run
+`mailmd disconnect <account> --dry-run` and show the user which files it
+would delete. Run it without `--dry-run` only when the user agrees. It
+deletes the saved login and keeps the archive. For Gmail and Outlook, pass
+on the last paragraph of its output. It says where the user can remove the
+app's access in their Google or Microsoft account.
+
 ## 5. Run the first sync
 
 ```sh

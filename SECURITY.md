@@ -57,6 +57,8 @@ mailmd doesn't use the system keychain yet. If that matters to you:
 - For Gmail and Outlook, the stored token only allows reading mail. You can
   revoke it in your Google or Microsoft account.
 - Don't put the config folder into backups that other people can read.
+- When you no longer sync an account, run `mailmd disconnect <account>`. It
+  deletes the account's login file.
 
 ## What mailmd sends over the network
 

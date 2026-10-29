@@ -165,6 +165,22 @@ folders and the messages mailmd couldn't save in full. `list accounts` shows
 each account and its archive folder. Neither command connects to your
 provider.
 
+## Remove an account
+
+```sh
+mailmd disconnect fastmail --dry-run
+mailmd disconnect fastmail
+```
+
+`disconnect` removes the account from mailmd and deletes its saved login.
+The archive stays as it is. With `--dry-run`, mailmd shows the files it
+would delete and changes nothing.
+
+For Gmail and Outlook, your Google or Microsoft account still lists the app
+you signed in with. mailmd prints the page where you can remove it. The
+[Gmail guide](gmail.md#removing-access) and the
+[Outlook guide](outlook.md#removing-access) have the details.
+
 ## Next steps
 
 - [Using mailmd with an agent](agents.md) has prompts for Claude Code and

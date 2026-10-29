@@ -204,7 +204,10 @@ update labels and flags that changed.
 
 ## Removing access
 
-To take mailmd's access away, open your [Google account
-permissions](https://myaccount.google.com/connections), find your app and
-remove its access. mailmd's saved login stops working at once. Your archive
-stays as it is.
+To remove the account from mailmd, run `mailmd disconnect <account>`. It
+deletes the saved login on your computer. Your archive stays as it is.
+
+Google still lists your app as allowed after that. To take its access away,
+open [Third-party apps & services](https://myaccount.google.com/connections)
+in your Google account, find your app and remove its access. If the account
+is still connected in mailmd, its saved login stops working at once.

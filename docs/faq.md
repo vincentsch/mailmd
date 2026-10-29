@@ -36,7 +36,7 @@ to you. An agent on a cloud model sends what it reads to its provider.
 In mailmd's config folder, in one file per account. On Linux and macOS,
 only your user can read these files. They are not encrypted, so anyone who
 can read your files can read them. [SECURITY.md](../SECURITY.md) has the
-details.
+details. `mailmd disconnect <account>` deletes the file of one account.
 
 ## Can I sync only some of my mail?
 

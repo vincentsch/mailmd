@@ -133,6 +133,10 @@ mailmd connect outlook --client-id 12345678-1234-1234-1234-123456789abc
 Outlook.com and most Microsoft 365 mailboxes no longer accept passwords over
 IMAP, so use `mailmd connect outlook` for them.
 
+`mailmd list accounts` shows the accounts you connected. To remove one, run
+`mailmd disconnect <account>`. It deletes the saved login and leaves the
+archive as it is.
+
 ## Sync
 
 ```sh

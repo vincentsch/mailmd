@@ -8,6 +8,7 @@ First release of mailmd.
 - Connect an IMAP mailbox of a known provider with only the email address, and say when the provider needs an app password.
 - Connect Gmail through the Gmail API and Outlook through Microsoft Graph with read-only access.
 - Connect an account again with only its name. mailmd uses the saved server settings, OAuth client or client ID.
+- Remove an account and its saved login with `mailmd disconnect`. The archive stays. For Gmail and Outlook, mailmd says where to remove the app's access in your Google or Microsoft account.
 - Show each account's email address in `mailmd status` and `mailmd list accounts`. mailmd asks Gmail and Microsoft for it, and takes it from `--email` for IMAP.
 - Sync all accounts with `mailmd sync`, fetching only new mail and updating changed flags.
 - Choose folders with `--folder` and `--exclude`, and leave out older mail with `--since`.

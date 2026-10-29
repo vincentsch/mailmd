@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -313,6 +314,50 @@ func Update(root, name string, change func(*AccountConfig)) (AccountConfig, erro
 		}
 	}
 	return AccountConfig{}, ErrNotFound
+}
+
+// Remove takes an account out of accounts.json and deletes its files in the
+// config folder: the saved login and the record of the last sync. It returns
+// the files it deleted. With dryRun it changes nothing and returns the files
+// it would delete. The archive is never touched.
+func Remove(root, name string, dryRun bool) (AccountConfig, []string, error) {
+	r, err := Load(root)
+	if err != nil {
+		return AccountConfig{}, nil, err
+	}
+	a, err := r.Find(name)
+	if err != nil {
+		return AccountConfig{}, nil, err
+	}
+	var files []string
+	for _, path := range []string{filepath.Join(root, "mailmd", a.CredentialRef), lastSyncPath(root, a)} {
+		if err := privatefs.CheckPath(path); err != nil {
+			return a, nil, err
+		}
+		if _, err := os.Lstat(path); err == nil {
+			files = append(files, path)
+		}
+	}
+	if dryRun {
+		return a, files, nil
+	}
+	// The files go first. If saving accounts.json fails after that, the
+	// account is still listed and running the command again finishes it.
+	for _, path := range files {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return a, nil, errors.Join(privatefs.ErrWrite, err)
+		}
+	}
+	// The account's folder goes only when it is empty, so nothing else in it
+	// is lost.
+	_ = os.Remove(filepath.Join(root, "mailmd", a.ArchiveDir))
+	r.Accounts = slices.DeleteFunc(r.Accounts, func(x AccountConfig) bool { return x.Name == a.Name })
+	data, _ := json.MarshalIndent(r, "", "  ")
+	path := filepath.Join(root, "mailmd", "accounts.json")
+	if err := privatefs.Replace([]privatefs.Replacement{{Path: path, Data: append(data, '\n')}}, privatefs.Hooks{}); err != nil {
+		return a, nil, err
+	}
+	return a, files, nil
 }
 
 // LastSync records how the last sync of an account went. It is saved in the

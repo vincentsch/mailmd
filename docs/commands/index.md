@@ -9,6 +9,7 @@ Copy your mailbox into Markdown files
 - [mailmd connect imap](mailmd_connect_imap.md) - Connect an IMAP mailbox
 - [mailmd connect outlook](mailmd_connect_outlook.md) - Connect Outlook or Microsoft 365
 - [mailmd demo](mailmd_demo.md) - Write a sample archive without any account
+- [mailmd disconnect](mailmd_disconnect.md) - Remove an account and its saved login
 - [mailmd list](mailmd_list.md) - List parts of your mailmd setup
 - [mailmd list accounts](mailmd_list_accounts.md) - List connected accounts
 - [mailmd status](mailmd_status.md) - Show what is in the archive

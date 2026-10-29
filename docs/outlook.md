@@ -150,7 +150,12 @@ mailbox language.
 
 ## Removing access
 
-For a personal account, open [account.live.com/consent/Manage](https://account.live.com/consent/Manage)
-and remove your app. For a work account, open [My Apps](https://myapps.microsoft.com/)
-or ask your administrator. You can also delete the app registration in Entra.
-Your archive stays as it is.
+To remove the account from mailmd, run `mailmd disconnect <account>`. It
+deletes the saved login on your computer. Your archive stays as it is.
+
+Microsoft still lists your app as allowed after that. For a personal
+account, open [account.live.com/consent/Manage](https://account.live.com/consent/Manage)
+and remove your app. For a work account, open [My Apps](https://myapps.microsoft.com/),
+choose your app, then "Manage your application" and "Revoke consent". If
+your administrator gave the consent for everyone, ask them. You can also
+delete the app registration in Entra.
