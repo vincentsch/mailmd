@@ -12,6 +12,17 @@ app. The registration is free, and you do it only once.
 
 Button and menu names below are in quotes, the way Microsoft shows them.
 
+mailmd was tested live on 2026-10-29 with a Microsoft 365 work account.
+These worked:
+
+- connecting, and connecting again with only the account name
+- syncs with `--since`, and syncs that had nothing new
+- read and flagged marks that changed in Outlook
+- messages that were moved or deleted, and a folder that was removed
+
+It has not been tested with a personal Outlook.com or Hotmail account yet.
+Please report what you find.
+
 ## Before you start
 
 Entra lets you register an app only inside a directory, which Microsoft also
@@ -69,6 +80,11 @@ else. Users can usually agree to it themselves. Some organizations want an
 administrator to approve it first. Then ask your admin to click "Grant admin
 consent for" your organization on this page.
 
+If the app already holds more permissions for your account, for example
+because you use the same app registration for another tool, Microsoft
+includes them in the login it gives mailmd. mailmd still only reads. It
+sends only read requests to Microsoft Graph.
+
 mailmd also asks Microsoft for your mail address, so that `mailmd status` can
 show it. Microsoft answers only when the app also has `User.Read`, which new
 app registrations get by default. Without it, mailmd shows the name you
@@ -84,7 +100,7 @@ Add `--tenant consumers` or `--tenant <your tenant ID>` if you chose one of
 those account types in step 1. mailmd then shows a code:
 
 ```text
-Open https://microsoft.com/devicelogin and enter the code ABCD-EFGH to allow read-only access to your mail.
+Open https://login.microsoft.com/device and enter the code F7KQ2MXTB to allow read-only access to your mail.
 Waiting for you to sign in. Press Ctrl-C to cancel.
 ```
 
