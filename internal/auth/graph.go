@@ -219,6 +219,16 @@ func graphIdentityHTTPClient(input *http.Client, conf oauth2.Config) *http.Clien
 	return graphHTTPClient(input, token.Scheme+"://"+token.Host, token.Path, device.Path)
 }
 
+// deviceLoginHosts are the hosts of the pages where Microsoft asks for the
+// sign-in code. Microsoft now sends https://login.microsoft.com/device (seen
+// in October 2026). Older answers had https://microsoft.com/devicelogin.
+var deviceLoginHosts = map[string]bool{
+	"login.microsoft.com":       true,
+	"microsoft.com":             true,
+	"www.microsoft.com":         true,
+	"login.microsoftonline.com": true,
+}
+
 func ConnectGraph(ctx context.Context, opts GraphConnectOptions) (GraphConnectResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -252,7 +262,7 @@ func ConnectGraph(ctx context.Context, opts GraphConnectOptions) (GraphConnectRe
 	}
 	u, err := url.Parse(device.VerificationURI)
 	if err != nil || u.Scheme != "https" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
-		(u.Hostname() != "microsoft.com" && u.Hostname() != "www.microsoft.com" && u.Hostname() != "login.microsoftonline.com") || device.DeviceCode == "" || device.UserCode == "" || device.Expiry.IsZero() || device.Interval < 0 || device.Interval > int64((time.Duration(1<<63-1)-30*time.Second)/time.Second) {
+		!deviceLoginHosts[u.Hostname()] || device.DeviceCode == "" || device.UserCode == "" || device.Expiry.IsZero() || device.Interval < 0 || device.Interval > int64((time.Duration(1<<63-1)-30*time.Second)/time.Second) {
 		return GraphConnectResult{}, oauthSetup("Microsoft sent a sign-in code that mailmd can't use")
 	}
 	if err := opts.HandleDeviceCode(ctx, DeviceCodePrompt{VerificationURI: device.VerificationURI, UserCode: device.UserCode, Expires: device.Expiry}); err != nil {

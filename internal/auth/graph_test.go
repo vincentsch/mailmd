@@ -33,6 +33,16 @@ func graphFixture(t *testing.T, mode string) (GraphConnectOptions, *atomic.Int64
 				_, _ = w.Write([]byte(`{"device_code":"PRIVATE-DEVICE","user_code":123}`))
 				return
 			}
+			if mode == "device-2026" {
+				// Microsoft's answer on 2026-10-29, with the device code
+				// replaced and the interval cut from 5 to 1 second.
+				data, err := os.ReadFile("testdata/graph-devicecode-2026-10.json")
+				if err != nil {
+					t.Error(err)
+				}
+				_, _ = w.Write(data)
+				return
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"device_code": "PRIVATE-DEVICE", "user_code": "PUBLIC-CODE", "verification_uri": "https://microsoft.com/devicelogin", "expires_in": 120, "interval": 1})
 			return
 		}
@@ -343,5 +353,20 @@ func TestGraphOptionsAndStoredScopeFailuresBeforeNetwork(t *testing.T) {
 	}
 	if _, err := LoadGraphToken(context.Background(), GraphLoadOptions{ConfigRoot: paths.ConfigRoot, ArchiveDir: paths.ArchiveDir}); !errors.Is(err, backend.ErrReconnectRequired) {
 		t.Fatalf("insufficient stored scope=%v", err)
+	}
+}
+
+func TestGraphAcceptsTheCurrentDeviceLoginPage(t *testing.T) {
+	opts, _ := graphFixture(t, "device-2026")
+	var shown DeviceCodePrompt
+	opts.HandleDeviceCode = func(_ context.Context, p DeviceCodePrompt) error {
+		shown = p
+		return nil
+	}
+	if _, err := ConnectGraph(context.Background(), opts); err != nil {
+		t.Fatalf("connect with Microsoft's current device answer: %v", err)
+	}
+	if shown.VerificationURI != "https://login.microsoft.com/device" || shown.UserCode != "F7KQ2MXTB" {
+		t.Fatalf("shown %#v", shown)
 	}
 }
