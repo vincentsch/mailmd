@@ -123,6 +123,9 @@ type RunError struct {
 func (e *RunError) Error() string { return e.Info.Message }
 func (e *RunError) Unwrap() error { return e.Cause }
 
+// AllMailPath names the one scope that holds all labels of a Gmail account.
+const AllMailPath = "All mail"
+
 // job is one provider scope to fetch. Gmail shows all labels through one
 // scope, so a job can stand for several folders.
 type job struct {
@@ -377,7 +380,7 @@ func (r *run) plan(folders []backend.Folder) ([]job, error) {
 		group := byKey[key]
 		path := group[0].Path
 		if len(group) > 1 {
-			path = "All mail"
+			path = AllMailPath
 		}
 		fs := r.state.folder(key)
 		if fs == nil {

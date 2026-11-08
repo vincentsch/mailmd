@@ -274,6 +274,13 @@ func renderSyncResult(w io.Writer, r mdsync.Result, home string, several bool) {
 		}
 	}
 	folders := plural(withNew, "folder", "folders")
+	checked := plural(synced, "folder", "folders")
+	inFolders := " in " + folders
+	// Gmail syncs all its labels as one scope, so a folder count would
+	// always say 1 while the files land in Inbox, Sent and the rest.
+	if len(r.Folders) == 1 && r.Folders[0].Path == mdsync.AllMailPath {
+		folders, checked, inFolders = "all mail", "all mail", ""
+	}
 	prefix := ""
 	if several {
 		prefix = r.Account + ": "
@@ -292,10 +299,10 @@ func renderSyncResult(w io.Writer, r mdsync.Result, home string, several bool) {
 		if several {
 			verb = "synced"
 		}
-		fmt.Fprintf(w, "%s%s %s in %s to %s in %s.\n", prefix, verb, plural(r.New, "new message", "new messages"), folders, where, seconds(r.Seconds))
+		fmt.Fprintf(w, "%s%s %s%s to %s in %s.\n", prefix, verb, plural(r.New, "new message", "new messages"), inFolders, where, seconds(r.Seconds))
 	default:
 		name := r.Account
-		fmt.Fprintf(w, "%s is up to date. mailmd checked %s in %s.\n", name, plural(synced, "folder", "folders"), seconds(r.Seconds))
+		fmt.Fprintf(w, "%s is up to date. mailmd checked %s in %s.\n", name, checked, seconds(r.Seconds))
 	}
 	if r.Updated > 0 {
 		files := map[bool]string{true: "its file", false: "their files"}[r.Updated == 1]
@@ -341,7 +348,7 @@ func warnings(r mdsync.Result) []string {
 			map[bool]string{true: "Its file stays", false: "Their files stay"}[r.Deleted == 1]))
 	}
 	if r.Excluded > 0 {
-		out = append(out, fmt.Sprintf("%s left out because of the folder filters.", map[bool]string{true: "1 message was", false: count(r.Excluded) + " messages were"}[r.Excluded == 1]))
+		out = append(out, fmt.Sprintf("%s left out because %s only in folders this account does not sync, such as Trash or Spam.", map[bool]string{true: "1 message was", false: count(r.Excluded) + " messages were"}[r.Excluded == 1], map[bool]string{true: "it is", false: "they are"}[r.Excluded == 1]))
 	}
 	for _, f := range r.Folders {
 		switch f.Status {

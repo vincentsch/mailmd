@@ -366,7 +366,7 @@ func TestSyncGmailWritesEachMessageOnce(t *testing.T) {
 		return gmail.Open(ctx, gmail.Config{HTTPClient: &http.Client{Transport: rewriteTransport{base: server.URL, transport: http.DefaultTransport}}})
 	}}
 	code, stdout, stderr := invoke(t, opts, "", "sync", "gmail", "--out", out)
-	if code != 0 || !strings.Contains(stdout, "Synced 2 new messages in 1 folder") {
+	if code != 0 || !strings.Contains(stdout, "Synced 2 new messages to ") {
 		t.Fatalf("%d %s %s", code, stdout, stderr)
 	}
 	var files []string
@@ -398,6 +398,22 @@ func TestSeveralAccountsAreSeparatedByOneBlankLine(t *testing.T) {
 	want := "one is up to date. mailmd checked 0 folders in less than a second.\n\ntwo is up to date. mailmd checked 0 folders in less than a second.\n"
 	if out.String() != want {
 		t.Fatalf("got:\n%q\nwant:\n%q", out.String(), want)
+	}
+}
+
+func TestGmailSummaryDoesNotCountItsOneScopeAsAFolder(t *testing.T) {
+	r := mdsync.Result{Account: "personal", Archive: "/home/dana/mail/personal", Outcome: mdsync.OutcomeCompleted, New: 13, Seconds: 7,
+		Folders: []mdsync.FolderResult{{Path: mdsync.AllMailPath, Status: "synced", New: 13}}}
+	var out bytes.Buffer
+	renderSyncResult(&out, r, "/home/dana", false)
+	if want := "Synced 13 new messages to ~/mail/personal in 7 s.\n"; out.String() != want {
+		t.Fatalf("got %q, want %q", out.String(), want)
+	}
+	r.New, r.Folders[0].New = 0, 0
+	out.Reset()
+	renderSyncResult(&out, r, "/home/dana", false)
+	if !strings.HasPrefix(out.String(), "personal is up to date. mailmd checked all mail in ") {
+		t.Fatalf("got %q", out.String())
 	}
 }
 

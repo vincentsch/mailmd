@@ -99,7 +99,7 @@ func accessNote(backend string) string {
 	switch backend {
 	case "gmail":
 		return "Google still lists the app you signed in with as allowed to read your mail. " +
-			"To remove it, open \"Third-party apps & services\" in your Google account: https://myaccount.google.com/connections"
+			"To remove it, open \"Linked apps\" in your Google account: https://myaccount.google.com/connections"
 	case "graph":
 		return "Microsoft still lists the app you signed in with as allowed to read your mail. " +
 			"To remove it, open My Apps at https://myapps.microsoft.com for a work or school account. " +
