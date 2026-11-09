@@ -47,7 +47,7 @@ func (m module) sync(f *rg.Factory, c *cobra.Command, args []string) error {
 	if err := checkGlobals(f); err != nil {
 		return err
 	}
-	root, err := configRoot(c)
+	root, err := m.configRoot(c)
 	if err != nil {
 		return err
 	}
@@ -216,16 +216,7 @@ func (m module) syncOptions(f *rg.Factory, c *cobra.Command, root string, a acco
 			if dry {
 				policy = auth.MemoryOnlyTokens
 			}
-			return m.opts.Open(ctx, a, accounts.OpenOptions{
-				ConfigRoot:      root,
-				Persistence:     policy,
-				HTTPClient:      m.opts.HTTPClient,
-				RootCAs:         m.opts.RootCAs,
-				Clock:           m.opts.Clock,
-				GraphBaseURL:    m.opts.GraphBaseURL,
-				IdentityBaseURL: m.opts.IdentityBaseURL,
-				Log:             log,
-			})
+			return m.open(ctx, root, a, policy, log)
 		},
 	}, nil
 }

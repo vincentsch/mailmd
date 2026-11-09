@@ -90,6 +90,26 @@ func (b *Backend) Folders(ctx context.Context) ([]backend.Folder, error) {
 	return append([]backend.Folder(nil), b.s.FolderRecords...), nil
 }
 
+// Count returns the number of fixed messages of each folder.
+func (b *Backend) Count(ctx context.Context, folders []backend.Folder) (map[string]int, error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if b.closed || b.failed {
+		return nil, backend.ErrClosed
+	}
+	b.s.Calls = append(b.s.Calls, Call{Instance: b.id, Operation: "count"})
+	out := map[string]int{}
+	for _, f := range folders {
+		if items, ok := b.s.Items[f.ScopeKey]; ok {
+			out[f.Path] = len(items)
+		}
+	}
+	return out, nil
+}
+
 type cursor struct {
 	Schema   string `json:"schema"`
 	Scope    string `json:"scope"`

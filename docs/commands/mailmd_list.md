@@ -12,6 +12,7 @@ mailmd list
 
 ```
 mailmd list accounts
+mailmd list folders work
 ```
 
 ## Related commands

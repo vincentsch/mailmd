@@ -12,6 +12,7 @@ Copy your mailbox into Markdown files
 - [mailmd disconnect](mailmd_disconnect.md) - Remove an account and its saved login
 - [mailmd list](mailmd_list.md) - List parts of your mailmd setup
 - [mailmd list accounts](mailmd_list_accounts.md) - List connected accounts
+- [mailmd list folders](mailmd_list_folders.md) - List the folders on the server
 - [mailmd status](mailmd_status.md) - Show what is in the archive
 - [mailmd sync](mailmd_sync.md) - Copy new mail into the archive
 - [mailmd update](mailmd_update.md) - Check for a newer version

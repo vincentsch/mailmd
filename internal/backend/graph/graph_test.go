@@ -401,3 +401,30 @@ func TestGraphFetchRefsGetsALargeMessageAgain(t *testing.T) {
 		t.Fatalf("diagnostics = %+v", res.Diagnostics)
 	}
 }
+
+func TestGraphCountAsksForEachFoldersTotal(t *testing.T) {
+	b, _ := graphTestBackend(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("$select") != "totalItemCount" {
+			t.Errorf("unexpected request %s", r.URL)
+		}
+		switch r.URL.Path {
+		case "/v1.0/me/mailFolders/inbox-id":
+			_ = json.NewEncoder(w).Encode(map[string]any{"totalItemCount": 12})
+		case "/v1.0/me/mailFolders/empty-id":
+			_ = json.NewEncoder(w).Encode(map[string]any{"totalItemCount": 0})
+		default:
+			_ = json.NewEncoder(w).Encode(map[string]any{})
+		}
+	})
+	counts, err := b.Count(context.Background(), []backend.Folder{
+		{Path: "Inbox", Fetchable: true, ScopeKey: scopeKey("inbox-id")},
+		{Path: "Empty", Fetchable: true, ScopeKey: scopeKey("empty-id")},
+		{Path: "Odd", Fetchable: true, ScopeKey: scopeKey("odd-id")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counts) != 2 || counts["Inbox"] != 12 || counts["Empty"] != 0 {
+		t.Fatalf("counts = %v", counts)
+	}
+}

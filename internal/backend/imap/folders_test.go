@@ -1,6 +1,7 @@
 package imap
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -111,4 +112,27 @@ func requireFolder(t *testing.T, folders []backend.Folder, path string, fetchabl
 	}
 	t.Fatalf("folder %q fetchable=%v not found in %#v", path, fetchable, folders)
 	return backend.Folder{}
+}
+
+func TestCountUsesStatusAndLeavesOutRefusedFolders(t *testing.T) {
+	refused := &imap.Error{Type: imap.StatusResponseTypeNo, Text: "Permission denied"}
+	srv := imaptest.Start(t, imaptest.Options{Folders: []imaptest.FolderSeed{
+		{Name: "INBOX", Delimiter: "/", UIDValidity: 1, Messages: []imaptest.MessageSeed{{UID: 1, Raw: []byte("Subject: a\r\n\r\na\r\n")}, {UID: 2, Raw: []byte("Subject: b\r\n\r\nb\r\n")}}},
+		{Name: "Empty", Delimiter: "/", UIDValidity: 2},
+		{Name: "Locked", Delimiter: "/", UIDValidity: 3, SelectError: refused},
+		{Name: "Parent", Delimiter: "/", Attributes: []string{string(imap.MailboxAttrNoSelect)}},
+	}})
+	b := openTestBackend(t, srv, TLSImplicit)
+	defer b.Close()
+	counts, err := b.Count(context.Background(), listTestFolders(t, b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counts) != 2 || counts["INBOX"] != 2 || counts["Empty"] != 0 {
+		t.Fatalf("counts = %v, want INBOX 2 and Empty 0 only", counts)
+	}
+	// The connection still works after the refused STATUS.
+	if _, err := b.Folders(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 }

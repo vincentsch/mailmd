@@ -147,6 +147,10 @@ folder, mailmd stops with an error that lists the folders the server has.
 than the date in the message. If you moved to a new provider and copied your
 old mail over, that mail can count as received on the day of the move.
 
+To see the folders on the server, run `mailmd list folders fastmail`. It
+shows how many messages each folder has and whether a sync copies it. For a
+folder that a sync leaves out, it also says why.
+
 Spam and trash are left out unless you name them with `--folder`. For a
 Gmail address over IMAP, mailmd syncs only `[Gmail]/All Mail`. That gives you
 one copy of every message, but no separate Inbox or Sent folder. The [IMAP
@@ -163,7 +167,8 @@ mailmd list accounts
 ran. With an account name, like `mailmd status fastmail`, it also lists the
 folders and the messages mailmd couldn't save in full. `list accounts` shows
 each account and its archive folder. Neither command connects to your
-provider.
+provider. `mailmd list folders fastmail` does, to show the folders as the
+server has them.
 
 ## Remove an account
 

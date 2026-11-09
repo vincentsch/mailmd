@@ -128,6 +128,38 @@ func (b *Backend) Folders(ctx context.Context) ([]mdbackend.Folder, error) {
 	return catalog.folders(), nil
 }
 
+// Count asks Gmail how many messages each label has. Archive is no label,
+// so it has no count.
+func (b *Backend) Count(ctx context.Context, folders []mdbackend.Folder) (map[string]int, error) {
+	ctx = nonNilContext(ctx)
+	if b == nil || b.isClosed() {
+		return nil, fmt.Errorf("gmail: count on closed backend: %w", mdbackend.ErrClosed)
+	}
+	b.opMu.Lock()
+	defer b.opMu.Unlock()
+	labels, err := b.client.Labels(ctx, b.userID)
+	if err != nil {
+		return nil, classifyAPIError(err)
+	}
+	ids := map[string]string{}
+	for _, rec := range buildLabelCatalog(labels).listed {
+		ids[rec.final] = rec.id
+	}
+	out := map[string]int{}
+	for _, f := range folders {
+		id, ok := ids[f.Path]
+		if !ok {
+			continue
+		}
+		n, err := b.client.LabelTotal(ctx, b.userID, id)
+		if err != nil {
+			return nil, classifyAPIError(err)
+		}
+		out[f.Path] = n
+	}
+	return out, nil
+}
+
 // Address returns the email address of the Gmail account.
 func (b *Backend) Address(ctx context.Context) (string, error) {
 	ctx = nonNilContext(ctx)

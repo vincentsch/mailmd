@@ -12,6 +12,8 @@ import (
 type gmailClient interface {
 	Profile(ctx context.Context, userID string) (gmailProfile, error)
 	Labels(ctx context.Context, userID string) ([]gmailLabel, error)
+	// LabelTotal returns how many messages have the label.
+	LabelTotal(ctx context.Context, userID, id string) (int, error)
 	ListMessages(ctx context.Context, userID, pageToken string, includeSpamTrash bool, query string, maxResults int64) (gmailMessagePage, error)
 	GetMessage(ctx context.Context, userID, id string) (gmailMessage, error)
 	ListHistory(ctx context.Context, userID, startHistoryID, pageToken string, maxResults int64) (gmailHistoryPage, error)
@@ -103,6 +105,14 @@ func (c officialClient) Labels(ctx context.Context, userID string) ([]gmailLabel
 		out = append(out, gmailLabel{ID: label.Id, Name: label.Name, Type: label.Type})
 	}
 	return out, nil
+}
+
+func (c officialClient) LabelTotal(ctx context.Context, userID, id string) (int, error) {
+	label, err := c.svc.Users.Labels.Get(userID, id).Context(ctx).Do()
+	if err != nil {
+		return 0, err
+	}
+	return int(label.MessagesTotal), nil
 }
 
 func (c officialClient) ListMessages(ctx context.Context, userID, pageToken string, includeSpamTrash bool, query string, maxResults int64) (gmailMessagePage, error) {

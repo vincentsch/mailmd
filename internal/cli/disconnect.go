@@ -39,7 +39,7 @@ func (m module) disconnect(f *rg.Factory, c *cobra.Command, args []string) error
 	if err := checkGlobals(f); err != nil {
 		return err
 	}
-	root, err := configRoot(c)
+	root, err := m.configRoot(c)
 	if err != nil {
 		return err
 	}

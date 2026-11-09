@@ -162,6 +162,25 @@ with `--folder` and `--exclude`, and leave out older mail with `--since`:
 mailmd sync work --since 12m --exclude Newsletters
 ```
 
+`mailmd list folders work` shows each folder on the server with its number
+of messages. It also says which folders a sync copies, and why it leaves out
+the others:
+
+```text
+work (IMAP, dana@fastmail.com)
+
+  FOLDER   MESSAGES  SYNC
+  Archive  94        yes
+  Drafts   0         yes
+  INBOX    412       yes
+  Sent     118       yes
+  Spam     23        no, left out by default
+  Trash    7         no, left out by default
+
+A sync copies 4 of these 6 folders.
+To copy a folder that is left out by default, name it for one sync, like: mailmd sync work --folder Spam
+```
+
 `mailmd status` shows what is in each archive and when it was last synced:
 
 ```text

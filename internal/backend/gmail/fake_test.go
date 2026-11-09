@@ -17,6 +17,8 @@ type fakeGmailClient struct {
 
 	labels    []gmailLabel
 	labelsErr error
+	// totals holds the message count of each label, by its ID.
+	totals map[string]int
 
 	messagePages  map[string]gmailMessagePage
 	messageErrors map[string]error
@@ -84,6 +86,19 @@ func (f *fakeGmailClient) Labels(ctx context.Context, userID string) ([]gmailLab
 		return nil, f.labelsErr
 	}
 	return append([]gmailLabel(nil), f.labels...), nil
+}
+
+func (f *fakeGmailClient) LabelTotal(ctx context.Context, userID, id string) (int, error) {
+	_ = userID
+	f.calls = append(f.calls, "label:"+id)
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, ok := f.totals[id]
+	if !ok {
+		return 0, apiErr(http.StatusNotFound)
+	}
+	return n, nil
 }
 
 func (f *fakeGmailClient) ListMessages(ctx context.Context, userID, pageToken string, includeSpamTrash bool, query string, maxResults int64) (gmailMessagePage, error) {

@@ -25,7 +25,8 @@ type FolderSeed struct {
 	Messages        []MessageSeed
 	OmitUIDNext     bool
 	OmitUIDValidity bool
-	// SelectError makes EXAMINE of this mailbox fail with this response.
+	// SelectError makes EXAMINE and STATUS of this mailbox fail with this
+	// response.
 	SelectError *imap.Error
 }
 

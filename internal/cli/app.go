@@ -223,8 +223,8 @@ var specs = []spec{
 	{
 		path:     "list",
 		short:    "List parts of your mailmd setup",
-		long:     "Show parts of your mailmd setup. Run mailmd list accounts to see your connected accounts with their provider and archive folder.",
-		examples: []string{"mailmd list accounts"},
+		long:     "Show parts of your mailmd setup. Run mailmd list accounts to see your connected accounts with their provider and archive folder. Run mailmd list folders to see the folders on the server and which of them a sync copies.",
+		examples: []string{"mailmd list accounts", "mailmd list folders work"},
 		related:  []string{"status"},
 	},
 	{
@@ -234,6 +234,17 @@ var specs = []spec{
 		examples: []string{"mailmd list accounts", "mailmd list accounts --json"},
 		related:  []string{"connect", "status"},
 		schema:   "mailmd-account-list/1",
+		modes:    allModes,
+	},
+	{
+		path:  "list folders",
+		short: "List the folders on the server",
+		long: "List the folders of an account as the server has them, with the number of messages in each. " +
+			"It also shows which folders a sync copies, and why it leaves out the others. Spam and trash are left out by default, and the --folder and --exclude settings saved with the account can leave out more.\n\n" +
+			"mailmd connects to the provider to get the list. It only reads, and it changes nothing in the archive. Without an account name, it lists the folders of your only account.",
+		examples: []string{"mailmd list folders work", "mailmd list folders work --json"},
+		related:  []string{"sync", "connect"},
+		schema:   "mailmd-folder-list/1",
 		modes:    allModes,
 	},
 	{
@@ -298,10 +309,11 @@ func (m module) Commands() []*rg.Command {
 	m.syncCommand(commands["sync"])
 	m.statusCommand(commands["status"])
 	m.listAccountsCommand(commands["list accounts"])
+	m.listFoldersCommand(commands["list folders"])
 	m.demoCommand(commands["demo"])
 	m.updateCommand(commands["update"])
 	commands["connect"].AddCommand(commands["connect imap"], commands["connect gmail"], commands["connect outlook"])
-	commands["list"].AddCommand(commands["list accounts"])
+	commands["list"].AddCommand(commands["list accounts"], commands["list folders"])
 	return []*rg.Command{commands["connect"], commands["disconnect"], commands["sync"], commands["status"], commands["list"], commands["demo"], commands["update"]}
 }
 
@@ -315,7 +327,7 @@ func lastWord(path string) string {
 }
 
 // configRoot returns the folder that holds mailmd's settings.
-func configRoot(c *cobra.Command) (string, error) {
+func (m module) configRoot(c *cobra.Command) (string, error) {
 	root, _ := c.Flags().GetString("config-root")
 	if root == "" {
 		var err error

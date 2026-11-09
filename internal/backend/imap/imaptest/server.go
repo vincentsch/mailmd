@@ -511,9 +511,29 @@ func (sess *session) Rename(string, string, *imap.RenameOptions) error {
 }
 func (sess *session) Subscribe(string) error   { return errUnsupported }
 func (sess *session) Unsubscribe(string) error { return errUnsupported }
-func (sess *session) Status(string, *imap.StatusOptions) (*imap.StatusData, error) {
-	return nil, errUnsupported
+
+// Status answers with the number of messages. A folder with a SelectError
+// refuses STATUS with the same error.
+func (sess *session) Status(name string, options *imap.StatusOptions) (*imap.StatusData, error) {
+	s := sess.server
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f := s.folders[canonical(name)]
+	if f == nil {
+		return nil, &imap.Error{Type: imap.StatusResponseTypeNo, Code: imap.ResponseCodeNonExistent, Text: "No such mailbox"}
+	}
+	if f.seed.SelectError != nil {
+		err := *f.seed.SelectError
+		return nil, &err
+	}
+	data := &imap.StatusData{Mailbox: name}
+	if options.NumMessages {
+		n := uint32(len(f.messages))
+		data.NumMessages = &n
+	}
+	return data, nil
 }
+
 func (sess *session) Append(string, imap.LiteralReader, *imap.AppendOptions) (*imap.AppendData, error) {
 	return nil, errUnsupported
 }

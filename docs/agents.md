@@ -66,7 +66,9 @@ frontmatter is a message you deleted, or an old version of a draft. Tell the
 agent to check that field before it treats a message as current.
 
 Run `mailmd sync` before you ask about new mail, or set up a [scheduled
-sync](scheduling.md). The agent can also run `mailmd sync` itself.
+sync](scheduling.md). The agent can also run `mailmd sync` itself. When a
+message seems to be missing, `mailmd list folders` shows the folders on the
+server and which of them a sync leaves out, like Junk.
 
 To tell every new session where your mail is, add a few lines to the agent's
 instructions, like `CLAUDE.md` or `AGENTS.md` in your home folder:

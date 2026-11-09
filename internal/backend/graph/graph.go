@@ -222,6 +222,36 @@ func (b *Backend) Folders(ctx context.Context) ([]backend.Folder, error) {
 	return output, nil
 }
 
+// Count asks Graph how many messages each folder holds, one request per
+// folder.
+func (b *Backend) Count(ctx context.Context, folders []backend.Folder) (map[string]int, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if b == nil || b.isClosed() {
+		return nil, backend.ErrClosed
+	}
+	b.op.Lock()
+	defer b.op.Unlock()
+	out := map[string]int{}
+	for _, f := range folders {
+		id, err := scopeID(f.ScopeKey)
+		if err != nil {
+			continue
+		}
+		var info struct {
+			Total *int `json:"totalItemCount"`
+		}
+		if err := b.json(ctx, b.endpoint("/me/mailFolders/"+url.PathEscape(id)+"?$select=totalItemCount"), 1<<20, 0, &info); err != nil {
+			return nil, err
+		}
+		if info.Total != nil && *info.Total >= 0 {
+			out[f.Path] = *info.Total
+		}
+	}
+	return out, nil
+}
+
 // wellKnownFolders are the Graph names of the folders with a role. Folder
 // names depend on the mailbox language, so the role comes from Graph.
 var wellKnownFolders = []struct {

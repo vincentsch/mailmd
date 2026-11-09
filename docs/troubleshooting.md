@@ -195,6 +195,15 @@ When `connect imap` says this, it saved nothing, so run it again with the
 right name. `connect gmail` and `connect outlook` save the login first, so
 you don't have to sign in again. Their message says so.
 
+**A message you expect is not in the archive**
+
+Run `mailmd sync` first, then `mailmd list folders work`. It shows how many
+messages each folder on the server has, and whether a sync copies the folder.
+The message may be in a folder that is left out, like Junk. To check that
+folder without writing anything, run
+`mailmd sync work --folder Junk --dry-run`. It says how many new messages a
+sync of Junk would fetch. Without `--dry-run`, that sync copies Junk once.
+
 **"The folder Newsletters is no longer on the server. Its files stay in the
 archive."**
 

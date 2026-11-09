@@ -149,7 +149,7 @@ type connectOptions struct {
 }
 
 func (m module) readConnectOptions(c *cobra.Command) (connectOptions, error) {
-	root, err := configRoot(c)
+	root, err := m.configRoot(c)
 	if err != nil {
 		return connectOptions{}, err
 	}

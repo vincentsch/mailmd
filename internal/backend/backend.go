@@ -54,6 +54,14 @@ const (
 	RoleImportant Role = "important"
 )
 
+// Counter is implemented by backends that can count the messages in their
+// folders. mailmd list folders shows the numbers.
+type Counter interface {
+	// Count returns how many messages each folder holds, by the folder's
+	// path. A folder the provider can't count is missing from the map.
+	Count(ctx context.Context, folders []Folder) (map[string]int, error)
+}
+
 // Addresser is implemented by backends that can ask the provider for the
 // mailbox's email address. Connect saves it with the account.
 type Addresser interface {

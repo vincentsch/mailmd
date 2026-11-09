@@ -482,3 +482,63 @@ func TestFlagChangesAndDeletionsOnTheServer(t *testing.T) {
 		})
 	}
 }
+
+func TestListFoldersCountsTheMessagesOnTheServer(t *testing.T) {
+	for _, s := range servers(t) {
+		t.Run(s.name, func(t *testing.T) {
+			u := user(t)
+			msgs := mailbox()
+			seed(t, s, u, msgs)
+			r := newRun(t, s)
+			r.connect(s, u)
+			code, stdout, stderr := r.mailmd("", "list", "folders", "work", "--json")
+			var list cli.FolderList
+			if err := json.Unmarshal([]byte(stdout), &list); code != 0 || err != nil {
+				t.Fatalf("list folders: %d %v\n%s\n%s", code, err, stdout, stderr)
+			}
+			want := map[string]int{}
+			for _, m := range msgs {
+				want[m.Folder]++
+			}
+			got := map[string]int{}
+			for _, f := range list.Folders {
+				if f.Messages != nil {
+					got[f.Path] = *f.Messages
+				}
+			}
+			for folder, n := range want {
+				if got[folder] != n {
+					t.Errorf("%s: %d messages, want %d (all: %v)", folder, got[folder], n, got)
+				}
+			}
+		})
+	}
+}
+
+// Dovecot's certificate comes from a CA that only the test knows, like a
+// company's own CA. With --ca-file, connect and sync trust it without any
+// help from the test.
+func TestCAFileIsSavedWithTheAccount(t *testing.T) {
+	for _, s := range servers(t) {
+		if s.name == "greenmail" {
+			continue // its TLS front has a certificate that exists only in memory
+		}
+		t.Run(s.name, func(t *testing.T) {
+			u := user(t)
+			seed(t, s, u, demo.Messages()[:2])
+			r := newRun(t, s)
+			r.opts.RootCAs = nil
+			host, port, _ := net.SplitHostPort(s.addr)
+			args := []string{"connect", "imap", "--account", "work", "--host", host, "--port", port, "--tls", s.tls, "--username", u, "--password-stdin"}
+			if code, _, stderr := r.mailmd(s.password+"\n", args...); code == 0 || !strings.Contains(stderr, "not trusted") {
+				t.Fatalf("connect without the CA file: %d %s", code, stderr)
+			}
+			if code, stdout, stderr := r.mailmd(s.password+"\n", append(args, "--ca-file", os.Getenv("MAILMD_IT_CA"))...); code != 0 {
+				t.Fatalf("connect: %d %s %s", code, stdout, stderr)
+			}
+			if result := r.sync().Accounts[0]; result.New != 2 {
+				t.Fatalf("sync: %+v", result)
+			}
+		})
+	}
+}

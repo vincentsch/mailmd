@@ -259,3 +259,27 @@ func mapKeys(m map[string]struct{}) []string {
 	}
 	return out
 }
+
+func TestCountAsksForEachLabelsTotal(t *testing.T) {
+	fake := newFakeClient()
+	fake.labels = []gmailLabel{
+		{ID: "INBOX", Name: "INBOX", Type: "system"},
+		{ID: "SPAM", Name: "SPAM", Type: "system"},
+		{ID: "u-work", Name: "Work", Type: "user"},
+	}
+	fake.totals = map[string]int{"INBOX": 7, "SPAM": 2, "u-work": 0}
+	b := openFakeBackend(t, fake)
+	folders, err := b.Folders(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts, err := b.Count(context.Background(), folders)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Archive is mailmd's folder for mail without a label, so Gmail can't
+	// count it.
+	if !reflect.DeepEqual(counts, map[string]int{"Inbox": 7, "Spam": 2, "Work": 0}) {
+		t.Fatalf("counts = %v", counts)
+	}
+}

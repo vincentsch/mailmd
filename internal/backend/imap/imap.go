@@ -103,6 +103,42 @@ func (b *Backend) Folders(ctx context.Context) ([]backend.Folder, error) {
 	return foldersFromList(list), nil
 }
 
+// Count asks the server how many messages each folder holds, with one
+// STATUS command per folder. STATUS doesn't open a folder, so it changes
+// nothing. A folder whose STATUS the server refuses has no count.
+func (b *Backend) Count(ctx context.Context, folders []backend.Folder) (map[string]int, error) {
+	unlock, err := b.begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+
+	out := map[string]int{}
+	for _, f := range folders {
+		if !f.Fetchable || f.ScopeKey == "" {
+			continue
+		}
+		mailbox, _, _, err := decodeScopeKey(f.ScopeKey)
+		if err != nil {
+			return nil, err
+		}
+		b.conn.allow(1 << 20)
+		data, err := b.client.Status(mailbox, &imap.StatusOptions{NumMessages: true}).Wait()
+		var refused *imap.Error
+		switch {
+		case errors.As(err, &refused):
+			b.logf("%s: STATUS %s was refused: %s", b.host, f.Path, refused.Text)
+			continue
+		case err != nil:
+			return nil, b.commandError(ctx, "count the messages in "+f.Path, err)
+		}
+		if data.NumMessages != nil {
+			out[f.Path] = int(*data.NumMessages)
+		}
+	}
+	return out, nil
+}
+
 // Close drops the connection. It is safe to call more than once.
 func (b *Backend) Close() error {
 	if b == nil {

@@ -136,7 +136,7 @@ func (f Filter) Validate() error {
 // Excludes reports whether a folder is left out, and why.
 func (f Filter) Excludes(folder string, role backend.Role) (bool, string) {
 	if matchesAny(f.Exclude, folder) {
-		return true, "excluded by --exclude"
+		return true, "left out by --exclude"
 	}
 	if len(f.Folders) > 0 {
 		if matchesAny(f.Folders, folder) {

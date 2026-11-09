@@ -98,9 +98,10 @@ runs `mailmd connect outlook --client-id <id>` and enters the code that
 mailmd shows on Microsoft's page. Neither needs a password from you.
 
 When the user says it worked, run `mailmd list accounts` to check, then
-`mailmd status <account>`. The connect output went to the user's terminal,
-so you didn't see notes like which folders a sync leaves out. `status` shows
-the account as mailmd saved it. If the connect failed, ask the user for the
+`mailmd list folders <account>`. The connect output went to the user's
+terminal, so you didn't see notes like which folders a sync leaves out.
+`list folders` shows each folder on the server with its number of messages,
+and whether a sync copies it. If the connect failed, ask the user for the
 error. Its second line, when there is one, says what to do.
 [docs/troubleshooting.md](docs/troubleshooting.md) has more.
 
@@ -169,6 +170,11 @@ if the user agrees:
   original message is the `.eml` file it links to.
 - Attachments are in the `.attachments` folder next to each message, and the
   message links to them.
+- If a message the user expects is missing, run `mailmd list folders
+  <account>`. It shows each folder on the server with its number of
+  messages, and whether a sync copies it. Junk and Trash are left out by
+  default. `mailmd sync <account> --folder Junk --dry-run` says how many new
+  messages are in Junk without writing anything.
 - Name the files you used, so the user can check them.
 
 [docs/files.md](docs/files.md) describes every field and file.
