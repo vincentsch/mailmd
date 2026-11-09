@@ -19,7 +19,7 @@ Copy your mailbox into Markdown files
 
 ## Global flags
 
-- `--config-root` Folder for mailmd's settings and logins (default: your user config folder)
+- `--config-root` Folder for mailmd's settings and logins (default: $MAILMD_CONFIG_ROOT, or your user config folder)
 - `--dry-run` Preview changes without performing them
 - `--include-meta` Wrap the JSON output as {data, meta} with request details
 - `--jq` Filter the JSON output with a jq expression

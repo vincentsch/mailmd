@@ -632,3 +632,31 @@ func TestMistypedCommandSuggestsTheRightOne(t *testing.T) {
 		t.Fatalf("%d %q", code, stderr)
 	}
 }
+
+func TestConfigRootComesFromTheEnvironment(t *testing.T) {
+	home := t.TempDir()
+	root := filepath.Join(home, "jobs", "mailmd-config")
+	registerMock(t, root, "work")
+	other := t.TempDir()
+	registerMock(t, other, "other")
+	env := func(value string) func(string) string {
+		return func(key string) string {
+			if key == "MAILMD_CONFIG_ROOT" {
+				return value
+			}
+			return ""
+		}
+	}
+	// cron and systemd pass ~ on as it is, so mailmd expands it.
+	for _, value := range []string{root, "~/jobs/mailmd-config"} {
+		code, stdout, stderr := invoke(t, Options{HomeDir: home, Getenv: env(value)}, "", "list", "accounts")
+		if code != 0 || !strings.Contains(stdout, "work") {
+			t.Fatalf("MAILMD_CONFIG_ROOT=%s: %d %s %s", value, code, stdout, stderr)
+		}
+	}
+	// --config-root wins over the variable.
+	code, stdout, _ := invoke(t, Options{HomeDir: home, Getenv: env(root)}, "", "list", "accounts", "--config-root", other)
+	if code != 0 || !strings.Contains(stdout, "other") || strings.Contains(stdout, "work") {
+		t.Fatalf("--config-root: %d %s", code, stdout)
+	}
+}

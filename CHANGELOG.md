@@ -26,4 +26,5 @@ First release of mailmd.
 - Show progress in a terminal and print one summary line per account. It says how many folders the sync checked, and names them when `--folder` chose them.
 - Explain errors with their cause and the next step.
 - Try the output with `mailmd demo`, without an account.
+- Set the config folder once with `MAILMD_CONFIG_ROOT`, for scheduled jobs and agents, instead of `--config-root` on each command.
 - Run on Linux, macOS and Windows.

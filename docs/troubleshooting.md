@@ -244,9 +244,10 @@ again with the command that the second line shows.
 | macOS | `~/Library/Application Support/mailmd` |
 | Windows | `%AppData%\mailmd` |
 
-`--config-root` chooses another folder for one command. mailmd puts its files
-in a `mailmd` folder inside it, so `--config-root ~/.config` and
-`--config-root ~/.config/mailmd` both find the files above.
+`--config-root` chooses another folder for one command. To use another folder
+for every command, set the `MAILMD_CONFIG_ROOT` environment variable instead.
+mailmd puts its files in a `mailmd` folder inside it, so `--config-root
+~/.config` and `--config-root ~/.config/mailmd` both find the files above.
 
 **Where is my mail?**
 

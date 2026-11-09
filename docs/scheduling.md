@@ -30,9 +30,36 @@ When a sync is still running, the next one stops with "Another mailmd sync of
 this archive is running" and exit code 2. So pick an interval that is longer
 than a normal sync takes.
 
-Scheduled jobs often run with a short PATH, so use the full path to mailmd.
-`command -v mailmd` prints it. The examples below use the install script's
-default, `~/.local/bin/mailmd`.
+## What a scheduled job needs
+
+A scheduled job doesn't run in your shell, so it doesn't get your shell's
+settings. It needs these things:
+
+- The full path to mailmd, because scheduled jobs often run with a short
+  PATH. `command -v mailmd` prints it. The examples below use the install
+  script's default, `~/.local/bin/mailmd`.
+- Your user. mailmd saves the logins and the settings of your accounts in
+  its config folder, in your home folder. Run the job as the user who
+  connected the accounts.
+- The same config folder. If you connected with `--config-root`, set the
+  `MAILMD_CONFIG_ROOT` environment variable to that folder in the job, or add
+  `--config-root` to the command. When both are there, `--config-root` wins.
+
+Everything else is saved with the account, like the archive folder and a CA
+file that you gave with `--ca-file`. So the job needs no other flags, and no
+variable like `SSL_CERT_FILE`.
+
+For a config folder of your own, the cron example below becomes:
+
+```cron
+MAILMD_CONFIG_ROOT=/home/dana/work/mailmd-config
+*/15 * * * * $HOME/.local/bin/mailmd sync --quiet
+```
+
+In the systemd service, add `Environment=MAILMD_CONFIG_ROOT=%h/work/mailmd-config`
+under `[Service]`. For launchd, add the variable under the
+`EnvironmentVariables` key of the plist. In Task Scheduler, add
+`--config-root` with the folder to `-Argument`.
 
 ## cron (Linux and macOS)
 

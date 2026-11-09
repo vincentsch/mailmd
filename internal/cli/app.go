@@ -81,7 +81,7 @@ func New(opts Options) *rg.App {
 		ErrorPolicy:    &rg.ErrorPolicy{Classify: classifyError, Render: renderError},
 	})
 	flags := app.Root().PersistentFlags()
-	flags.String("config-root", opts.ConfigRoot, "Folder for mailmd's settings and logins (default: your user config folder)")
+	flags.String("config-root", opts.ConfigRoot, "Folder for mailmd's settings and logins (default: $MAILMD_CONFIG_ROOT, or your user config folder)")
 	flags.Bool("verbose", false, "Show the details when mailmd can't read an IMAP server's answer")
 	// rungrad adds a --config flag, but mailmd has no config file.
 	_ = flags.MarkHidden("config")
@@ -329,14 +329,24 @@ func lastWord(path string) string {
 	return path
 }
 
-// configRoot returns the folder that holds mailmd's settings.
+// configRoot returns the folder that holds mailmd's settings. It comes
+// from --config-root, else from MAILMD_CONFIG_ROOT, so a scheduled job or an
+// agent can set it once. Else it is the user config folder of the system.
 func (m module) configRoot(c *cobra.Command) (string, error) {
 	root, _ := c.Flags().GetString("config-root")
+	if root == "" {
+		root = m.opts.Getenv("MAILMD_CONFIG_ROOT")
+	}
 	if root == "" {
 		var err error
 		if root, err = os.UserConfigDir(); err != nil || root == "" {
 			return "", rg.NewError(rg.ExitUsage, "Cannot find your user config folder. Set one with --config-root.")
 		}
+	}
+	// cron and systemd don't expand ~ in environment variables.
+	root, err := absPath(root, m.home())
+	if err != nil {
+		return "", err
 	}
 	// The config folder can be a symbolic link, as dotfile managers often
 	// set up.
