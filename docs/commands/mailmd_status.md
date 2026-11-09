@@ -17,7 +17,7 @@ mailmd status work --json
 
 ## Flags
 
-- `--out` Look in this folder instead of the account's saved folder
+- `--out` Folder that holds the account folders, to look in instead of the saved --out
 
 ## Output
 

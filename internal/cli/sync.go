@@ -28,7 +28,7 @@ func (m module) syncCommand(cmd *rg.Command) {
 	cmd.Use = "sync [account...]"
 	cmd.Args = cobra.ArbitraryArgs
 	cmd.Configure = func(c *cobra.Command) {
-		c.Flags().String("out", "", "Write to this folder for this run instead of the account's saved folder")
+		c.Flags().String("out", "", "Folder that holds the account folders, for this run instead of the saved --out")
 		addFilterFlags(c, false)
 		c.Flags().Int64("max-message-bytes", backend.DefaultMaxMessageBytes, "Save only the headers of a message larger than this many bytes")
 	}

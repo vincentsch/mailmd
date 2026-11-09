@@ -34,7 +34,7 @@ func (m module) statusCommand(cmd *rg.Command) {
 	cmd.Use = "status [account...]"
 	cmd.Args = cobra.ArbitraryArgs
 	cmd.Configure = func(c *cobra.Command) {
-		c.Flags().String("out", "", "Look in this folder instead of the account's saved folder")
+		c.Flags().String("out", "", "Folder that holds the account folders, to look in instead of the saved --out")
 	}
 	cmd.Run = m.status
 }

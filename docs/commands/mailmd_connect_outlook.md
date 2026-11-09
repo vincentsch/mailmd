@@ -24,7 +24,7 @@ mailmd connect outlook --account work
 - `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*', instead of the default folders. mailmd saves it with the account (repeat for more)
 - `--include` Also sync this folder, like Junk, and keep the default folders. mailmd saves it with the account (repeat for more)
 - `--keep-raw` Also save each original message as an .eml file next to its Markdown file
-- `--out` Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived
+- `--out` Folder that holds the account folders (default: ~/mail). An account named work gets ~/mail/work. A new folder doesn't move the mail that is already archived
 - `--prefer-text` Use the plain text part of a message instead of converting its HTML part
 - `--since` Fetch only mail received on or after this day, like 2025-01-31, or within an age like 30d, 12m or 2y
 - `--tenant` Who can sign in: common, organizations, consumers, or your tenant ID

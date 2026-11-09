@@ -94,8 +94,11 @@ folder, give `--out` when you connect:
 mailmd connect imap --email you@example.com --out ~/Documents/mail
 ```
 
-mailmd saves the folder for that account. For a single sync into another
-folder, use `mailmd sync --out <folder>`.
+`--out` is the folder that holds the account folders. mailmd puts each
+account in a folder of its own inside it, so the mail of an account named
+`work` goes to `~/Documents/mail/work`. mailmd saves the folder for that
+account. For a single sync into another folder, use
+`mailmd sync --out <folder>`.
 
 ## Moving the archive
 

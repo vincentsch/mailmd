@@ -147,10 +147,14 @@ mailmd sync
 mailmd checked 4 folders and saved 624 new messages to ~/mail/work in 12 s.
 ```
 
-The mail goes to `~/mail/<account>`, unless you chose another folder with
-`--out` when you connected. The next sync fetches only new mail. It also
-updates the read and starred marks that changed. If you stop a sync with
-Ctrl-C, the files saved so far stay, and the next run continues from there.
+The mail goes to `~/mail/<account>`. To put it somewhere else, give `--out`
+to `mailmd connect`. `--out` is the folder that holds the account folders, so
+with `--out ~/Documents/mail` the account `work` goes to
+`~/Documents/mail/work`.
+
+The next sync fetches only new mail. It also updates the read and starred
+marks that changed. If you stop a sync with Ctrl-C, the files saved so far
+stay, and the next run continues from there.
 
 mailmd leaves out spam and trash by default. For a Gmail address over IMAP,
 it syncs only `[Gmail]/All Mail`. You get one copy of every message,
@@ -212,7 +216,8 @@ system.
 
 ## Use it with Claude Code or Codex
 
-Start your agent in the mail folder, or tell it where the folder is:
+Start your agent in the mail folder, or tell it where the folder is. That is
+`~/mail`, or the folder you gave to `--out`:
 
 ```sh
 cd ~/mail && claude

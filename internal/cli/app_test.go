@@ -461,6 +461,23 @@ func TestEveryCommandHasItsOwnOneLineHelp(t *testing.T) {
 	}
 }
 
+// --out names the folder that holds the account folders, not the account
+// folder itself. Each command with the flag says so in its help.
+func TestOutHelpNamesTheFolderThatHoldsTheAccountFolders(t *testing.T) {
+	for _, command := range [][]string{{"connect", "imap"}, {"connect", "gmail"}, {"connect", "outlook"}, {"sync"}, {"status"}} {
+		_, help, _ := invoke(t, Options{ConfigRoot: t.TempDir()}, "", append(command, "--help")...)
+		found := false
+		for _, line := range strings.Split(help, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "--out ") {
+				found = strings.Contains(line, "Folder that holds the account folders")
+			}
+		}
+		if !found {
+			t.Errorf("mailmd %s --help doesn't say that --out holds the account folders:\n%s", strings.Join(command, " "), help)
+		}
+	}
+}
+
 func TestOfflineConformance(t *testing.T) {
 	root, out := t.TempDir(), t.TempDir()
 	for _, name := range []string{"fixture", "forbidden", "broken"} {

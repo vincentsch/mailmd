@@ -25,7 +25,7 @@ mailmd sync --quiet
 - `--folder` Sync only this folder and its subfolders in this run, like INBOX or Junk. It isn't saved (repeat for more)
 - `--keep-raw` Also save each original message as an .eml file next to its Markdown file
 - `--max-message-bytes` Save only the headers of a message larger than this many bytes
-- `--out` Write to this folder for this run instead of the account's saved folder
+- `--out` Folder that holds the account folders, for this run instead of the saved --out
 - `--prefer-text` Use the plain text part of a message instead of converting its HTML part
 - `--since` Fetch only mail received on or after this day, like 2025-01-31, or within an age like 30d, 12m or 2y
 

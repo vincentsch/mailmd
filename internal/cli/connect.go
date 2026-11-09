@@ -48,6 +48,10 @@ type ConnectResult struct {
 	Note string `json:"note,omitempty"`
 }
 
+// outHelp describes --out of the connect commands. It names the folder that
+// holds the account folders, which is easy to take for the account folder.
+const outHelp = "Folder that holds the account folders (default: ~/mail). An account named work gets ~/mail/work. A new folder doesn't move the mail that is already archived"
+
 func (m module) connectCommands(commands map[string]*rg.Command) {
 	imapCmd := commands["connect imap"]
 	imapCmd.Configure = func(c *cobra.Command) {
@@ -59,7 +63,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("tls", "implicit", "How to encrypt the connection: implicit or starttls")
 		c.Flags().String("ca-file", "", "PEM file with the certificate of your server's own certificate authority. mailmd trusts it in addition to the system's certificates and saves it with the account")
 		c.Flags().Bool("password-stdin", false, "Read the password from the first line of standard input")
-		c.Flags().String("out", "", "Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived")
+		c.Flags().String("out", "", outHelp)
 		addFilterFlags(c, true)
 	}
 	imapCmd.Run = m.connectIMAP
@@ -69,7 +73,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("client-secret", "", "The OAuth client JSON file you downloaded from Google Cloud (not needed to connect an account again)")
 		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: gmail)")
 		c.Flags().Bool("no-browser", false, "Don't open a browser, only print the sign-in address")
-		c.Flags().String("out", "", "Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived")
+		c.Flags().String("out", "", outHelp)
 		addFilterFlags(c, true)
 	}
 	gmailCmd.Run = m.connectGmail
@@ -79,7 +83,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("client-id", "", "The application (client) ID of your Microsoft app registration (not needed to connect an account again)")
 		c.Flags().String("tenant", "common", "Who can sign in: common, organizations, consumers, or your tenant ID")
 		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: outlook)")
-		c.Flags().String("out", "", "Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived")
+		c.Flags().String("out", "", outHelp)
 		addFilterFlags(c, true)
 	}
 	outlookCmd.Run = m.connectOutlook
