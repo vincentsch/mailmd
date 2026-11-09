@@ -80,7 +80,7 @@ is a number. Fields without a value are left out.
 | `date` | When the message was sent, from its Date header, with the sender's UTC offset. If the header is missing or broken, mailmd uses the time the provider received the message. |
 | `folder` | The provider's folder, like `INBOX` or `Work/Clients` |
 | `labels` | Gmail API only: all labels of the message, like `["Inbox", "Work/Clients"]` |
-| `flags` | Any of `seen`, `flagged`, `answered` and `draft` |
+| `flags` | Any of `seen` (read), `flagged` (starred), `answered` and `draft`. Left out when the message has none, see below. |
 | `deleted_on_server` | The day mailmd noticed that the message was deleted on the server, like `"2026-10-26"`. The file stays. |
 | `attachments` | The attachment file names, in order |
 | `omitted_bytes` | Only when the body was left out because the message is too large (see below) |
@@ -92,6 +92,18 @@ is a number. Fields without a value are left out.
 
 When the flags of a message change on the server, the next sync writes the
 new flags into the frontmatter of that file. The body doesn't change.
+
+`flags` is left out when a message has none. So a file without `flags` is a
+message that is unread and not starred. mailmd copies the flags that the
+server keeps and adds none of its own. A server that keeps no flags sends
+none, so every message from it looks unread in the archive, and mailmd can't
+tell that apart from mail you haven't read. Mail that a program copied onto
+the server, like an import from another provider, can also come without
+flags.
+
+Only IMAP servers report `answered`, and only when your mail program set it
+as you replied. To find out whether you answered a message, look for your
+reply with the same `thread_id`, usually in the Sent folder.
 
 IMAP has no thread IDs, so mailmd uses the first message of the References
 header. Many mail programs cut References short or send only In-Reply-To.

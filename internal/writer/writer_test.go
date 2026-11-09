@@ -3,6 +3,7 @@ package writer
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -531,5 +532,25 @@ func TestIndexEntryHasTheRecipientsAndSurvivesARebuild(t *testing.T) {
 	read, ok := ReadIndexEntry(result.Files[0].Path, written.Path)
 	if !ok || !reflect.DeepEqual(read, written) {
 		t.Fatalf("from the file:\n%+v\nwritten:\n%+v", read, written)
+	}
+}
+
+// docs/files.md says that a message without flags has no flags field, in
+// the file and in the index. Readers take that as unread.
+func TestAMessageWithoutFlagsHasNoFlagsField(t *testing.T) {
+	root := t.TempDir()
+	msg := plainMessage(time.UTC)
+	msg.Folders = []string{"INBOX"}
+	msg.Flags = mail.Flags{}
+	result, err := WriteMessage(context.Background(), Options{Root: root, Account: "Acct"}, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(readFile(t, result.Files[0].Path)); strings.Contains(got, "flags:") {
+		t.Fatalf("file has flags:\n%s", got)
+	}
+	line, _ := json.Marshal(IndexEntries(msg, result)[0])
+	if strings.Contains(string(line), "flags") {
+		t.Fatalf("index line has flags: %s", line)
 	}
 }
