@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/spf13/cobra v1.10.2
-	github.com/vincentsch/rungrad v0.3.4
+	github.com/vincentsch/rungrad v0.3.5
 	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sys v0.49.0
