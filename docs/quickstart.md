@@ -218,10 +218,11 @@ The three folder flags change that:
 
 - `--include Junk` copies Junk in addition to the folders a sync copies
   anyway. Use it when you want one more folder.
-- `--folder INBOX` copies only the folders you name. On `mailmd connect` this
-  means that from now on a sync copies only these folders, and folders you
-  create later on the server are left out. A folder you name is copied even
-  when it is left out by default, like Junk.
+- `--folder INBOX` copies only the folders you name, and the ones that
+  `--include` adds. On `mailmd connect` this means that from now on a sync
+  copies only these folders, and folders you create later on the server are
+  left out. A folder you name is copied even when it is left out by default,
+  like Junk.
 - `--exclude Newsletters` leaves out a folder. It wins over `--folder` and
   `--include`.
 

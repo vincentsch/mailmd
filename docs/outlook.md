@@ -155,7 +155,8 @@ only those received on or after that day. Graph stops a filtered list at
 Junk Email and Deleted Items are left out by default. mailmd finds them by
 their role in Graph, so this works in every mailbox language. To copy Junk
 Email on every sync, add it with `--include 'Junk Email'` on
-`mailmd connect outlook`.
+`mailmd connect outlook`. Use the folder name that `mailmd list folders`
+shows, because it depends on the language of the mailbox.
 
 ## Removing access
 

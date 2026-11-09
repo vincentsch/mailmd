@@ -189,7 +189,7 @@ the headers of such a message. Remove anything private first.
 
 **"--folder "Inbx" matches no folder of work."**
 
-No folder has that name. The same goes for `--include`. The second line lists the folders the server has.
+No folder has that name. A typo in `--include` gets the same error. The second line lists the folders the server has.
 Folder names don't depend on case, and a name also matches its subfolders.
 When `connect imap` says this, it saved nothing, so run it again with the
 right name. `connect gmail` and `connect outlook` save the login first, so
