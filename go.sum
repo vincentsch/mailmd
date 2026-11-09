@@ -82,8 +82,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/vincentsch/rungrad v0.3.3 h1:Q7lCJ6PuCKTN76MbGbvtBdwSe7T1ArUJRmgFDS47vjs=
-github.com/vincentsch/rungrad v0.3.3/go.mod h1:kmmQJlN+BquaQ7YH7CqdI3fByBf+xGSX8h0o362UsAs=
+github.com/vincentsch/rungrad v0.3.4 h1:Z1LdlOFquDF0EMM7oQ/weI+84+3odAOz7Hrvj/S8yF4=
+github.com/vincentsch/rungrad v0.3.4/go.mod h1:kmmQJlN+BquaQ7YH7CqdI3fByBf+xGSX8h0o362UsAs=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/yuin/goldmark v1.7.1 h1:3bajkSilaCbjdKVsKdZjZCLBNPL9pYzrCakKaf4U49U=
 github.com/yuin/goldmark v1.7.1/go.mod h1:uzxRWxtg69N339t3louHJ7+O03ezfj6PlliRlaOzY1E=
