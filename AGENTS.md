@@ -17,9 +17,10 @@ the files are.
 
 ## Rules
 
-- Never handle the user's password. Don't ask for it in the chat. Don't put
-  it in a command or a file, and don't set it as an environment variable.
-  The user types it into mailmd's hidden prompt in their own terminal.
+- Don't ask for the user's password in the chat. The user types it into
+  mailmd's hidden prompt in their own terminal. If the user gives you the
+  password anyway and asks you to do the setup, follow
+  [the steps for that case](#if-the-user-gives-you-the-password).
 - Don't open files in mailmd's config folder. They hold the saved logins.
 - Don't edit or delete files in the archive. A sync may overwrite them, and
   the user may rely on them.
@@ -118,6 +119,28 @@ would delete. Run it without `--dry-run` only when the user agrees. It
 deletes the saved login and keeps the archive. For Gmail and Outlook, pass
 on the last paragraph of its output. It says where the user can remove the
 app's access in their Google or Microsoft account.
+
+### If the user gives you the password
+
+Sometimes the user writes the password into the chat and asks you to do the
+setup. Then you may run the connect command yourself. Pass the password on
+standard input with `--password-stdin`, through the shell's built-in
+`printf`:
+
+```sh
+printf '%s\n' 'the-password' | mailmd connect imap --email dana@example.com --password-stdin
+```
+
+- Put the password in single quotes. Write a single quote inside it as
+  `'\''`.
+- mailmd can't ask questions without a terminal, so give the settings as
+  flags. A server that mailmd doesn't know needs `--host`.
+- Never echo the password or repeat it in your answers. Don't write it into
+  a file or a script, and don't set it as an environment variable.
+- When the connect worked, tell the user that mailmd saved the password in
+  its config folder. The file is not encrypted, and on Linux and macOS only
+  the user can read it. The password is now also in this chat, so suggest an
+  app password if the provider offers one.
 
 ## 5. Run the first sync
 
