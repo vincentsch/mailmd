@@ -322,6 +322,11 @@ the server's numbers. Only their `ref` changes to the new numbers.
 `.mailmd/lock` stops a second sync from working on the same archive at the
 same time. Don't edit these files.
 
+The lock file stays after a sync, and that is normal. A sync locks the file
+only while it runs. The system lifts the lock when mailmd ends, also after a
+crash, so a lock file that is left behind doesn't stop the next sync. You
+don't need to delete it.
+
 When you move the archive to another folder, move the `.mailmd` folder with
 it. [Moving the archive](quickstart.md#moving-the-archive) shows the steps.
 

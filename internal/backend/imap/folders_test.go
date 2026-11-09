@@ -43,6 +43,11 @@ func TestFolderRolesFromAttributesAndNames(t *testing.T) {
 		{Mailbox: "INBOX.Papierkorb", Delim: '.'},
 		{Mailbox: "Work", Delim: '/'},
 		{Mailbox: "[Gmail]", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrNoSelect}},
+		// The special-use flag wins over the name. Without a flag, the name
+		// of the last level counts.
+		{Mailbox: "Unwanted", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrJunk}},
+		{Mailbox: "Spam", Delim: '/', Attrs: []imap.MailboxAttr{imap.MailboxAttrArchive}},
+		{Mailbox: "Projects/Trash", Delim: '/'},
 	}
 	want := map[string]backend.Role{
 		"INBOX":             backend.RoleInbox,
@@ -54,6 +59,9 @@ func TestFolderRolesFromAttributesAndNames(t *testing.T) {
 		"INBOX/Papierkorb":  backend.RoleTrash,
 		"Work":              backend.RoleNone,
 		"[Gmail]":           backend.RoleNone,
+		"Unwanted":          backend.RoleJunk,
+		"Spam":              backend.RoleArchive,
+		"Projects/Trash":    backend.RoleTrash,
 	}
 	for _, folder := range foldersFromList(list) {
 		if folder.Role != want[folder.Path] {

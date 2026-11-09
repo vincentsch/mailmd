@@ -561,6 +561,20 @@ func TestSecondSyncOfTheSameArchiveIsRefused(t *testing.T) {
 	}
 }
 
+// .mailmd/lock stays after a sync. Only a running sync holds the lock, so
+// the file left behind doesn't stop the next sync.
+func TestTheLockFileStaysAndDoesNotBlockTheNextSync(t *testing.T) {
+	root := t.TempDir()
+	s := testService(1)
+	mustRun(t, testOptions(root, s))
+	if _, err := os.Stat(filepath.Join(root, "work", ".mailmd", "lock")); err != nil {
+		t.Fatalf("lock file after a sync: %v", err)
+	}
+	if r := mustRun(t, testOptions(root, s)); r.New != 0 {
+		t.Fatalf("second sync = %+v", r)
+	}
+}
+
 func TestWriteFailureKeepsTheCursor(t *testing.T) {
 	root := t.TempDir()
 	opts := testOptions(root, testService(6))

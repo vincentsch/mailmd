@@ -451,3 +451,60 @@ func TestANewOutSaysWhereTheArchivedMailIs(t *testing.T) {
 		t.Fatalf("both folders have files:\n%s", stdout)
 	}
 }
+
+// The config folder finds its own files by paths inside it, so a plain move
+// keeps the account and its saved password. Only --out and the CA file are
+// saved as full paths. When the CA file moves too, connect with its new path.
+func TestMovingTheConfigFolderKeepsTheAccount(t *testing.T) {
+	server := imaptest.Start(t, imaptest.Options{})
+	home := t.TempDir()
+	old, moved := filepath.Join(home, "work", "mailmd-config"), filepath.Join(home, "Documents", "mailmd-config")
+	ca := filepath.Join(home, "work", "company-ca.pem")
+	if err := os.MkdirAll(old, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ca, server.CertPEM(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	no := false
+	opts := Options{ConfigRoot: old, HomeDir: home, Interactive: &no}
+	if code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin", "--ca-file", ca, "--folder", "INBOX")...); code != 0 {
+		t.Fatalf("connect %d %s %s", code, stdout, stderr)
+	}
+	if code, stdout, stderr := invoke(t, opts, "", "sync", "work"); code != 0 {
+		t.Fatalf("sync %d %s %s", code, stdout, stderr)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(moved), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(old, moved); err != nil {
+		t.Fatal(err)
+	}
+	opts.ConfigRoot = moved
+	opts.PasswordPrompt = func(context.Context, io.Reader, io.Writer, string) (string, error) {
+		t.Fatal("asked for the password")
+		return "", nil
+	}
+	if code, stdout, stderr := invoke(t, opts, "", "sync", "work"); code != 0 || !strings.Contains(stdout, "work is up to date.") {
+		t.Fatalf("sync after moving the config folder: %d %s %s", code, stdout, stderr)
+	}
+	if code, stdout, stderr := invoke(t, opts, "", "status", "work"); code != 0 || !strings.Contains(stdout, "completed") {
+		t.Fatalf("status after moving the config folder: %d %s %s", code, stdout, stderr)
+	}
+
+	newCA := filepath.Join(home, "Documents", "company-ca.pem")
+	if err := os.Rename(ca, newCA); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := invoke(t, opts, "", "sync", "work"); code != 2 || !strings.Contains(stderr, "Cannot read the CA file "+ca) {
+		t.Fatalf("sync after moving the CA file: %d %s", code, stderr)
+	}
+	code, stdout, stderr := invoke(t, opts, "", "connect", "imap", "--account", "work", "--ca-file", newCA, "--no-prompt")
+	if code != 0 || !strings.Contains(stdout, "kept its saved password") {
+		t.Fatalf("connect with the new CA file: %d %s %s", code, stdout, stderr)
+	}
+	if code, stdout, stderr := invoke(t, opts, "", "sync", "work"); code != 0 || !strings.Contains(stdout, "work is up to date.") {
+		t.Fatalf("sync with the new CA file: %d %s %s", code, stdout, stderr)
+	}
+}

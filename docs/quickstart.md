@@ -139,7 +139,50 @@ The config folder isn't part of the archive, so it stays where it is. The
 same goes for a CA file that you gave with `--ca-file`. If you move that
 file, connect again with `--ca-file` and the new path. Also change the path
 in your scheduled job and in your agent instructions, if they name the
-folder.
+folder. The next section shows how to move the config folder.
+
+## Moving the config folder
+
+The config folder holds the account list and the saved logins. It also has
+the result of each account's last sync. [Finding the
+files](troubleshooting.md#finding-the-files) says where it is.
+
+mailmd finds the files in the config folder by their place inside it, so you
+can move the whole folder. Two settings point outside it, and mailmd saves
+them as full paths. These are the archive folder from `--out` and the CA
+file from `--ca-file`. Moving the config folder doesn't change them. Say you
+set `MAILMD_CONFIG_ROOT=~/work/mailmd-config`, and you want the settings in
+`~/Documents/mailmd-config`:
+
+1. Make sure no sync runs. If you sync on a schedule, pause the job.
+2. Move the folder with everything in it:
+
+   ```sh
+   mv ~/work/mailmd-config ~/Documents/mailmd-config
+   ```
+
+3. Set `MAILMD_CONFIG_ROOT` to the new folder, like
+   `export MAILMD_CONFIG_ROOT=~/Documents/mailmd-config`. Also change it in
+   your scheduled job and in your agent instructions.
+4. If you moved the CA file, give mailmd its new path. mailmd keeps the
+   saved password:
+
+   ```sh
+   mailmd connect imap --account work --ca-file ~/Documents/company-ca.pem
+   ```
+
+   Run this after step 3, so that it changes the settings in the moved
+   folder.
+5. Run `mailmd sync work`. It says that `work` is up to date, or it fetches
+   only the new mail.
+
+If the archive moves as well, follow [Moving the
+archive](#moving-the-archive) for it before step 5.
+
+Without `MAILMD_CONFIG_ROOT`, mailmd's files are in a folder named `mailmd`,
+like `~/.config/mailmd`. To move it, keep that name, like
+`mv ~/.config/mailmd ~/Documents/mailmd`. Then set `MAILMD_CONFIG_ROOT` to
+the new folder, `~/Documents/mailmd`.
 
 ## Sync
 
@@ -251,6 +294,33 @@ This is how mailmd matches folder names:
 
 If a `--folder` or `--include` matches no folder, mailmd stops with an error
 that lists the folders the server has. On `connect`, it saves nothing then.
+
+### Which folders count as spam and trash
+
+mailmd goes by what a folder is for, and the name comes second:
+
+- Most IMAP servers mark their special folders with a special-use flag,
+  which says what a folder is for. A folder with the flag `\Junk` is spam,
+  and a folder with `\Trash` is trash, whatever its name. A folder with
+  another special-use flag, like `\Archive` or `\Sent`, is never spam or
+  trash.
+- For a folder without a special-use flag, mailmd goes by the last part of
+  its name, in any case. So `Work/Trash` counts as trash. These names count:
+
+  | Folder | Names |
+  | --- | --- |
+  | Spam | Spam, Junk, Junk E-mail, Junk Email, Junk-E-Mail, Bulk Mail, Spamverdacht |
+  | Trash | Trash, Deleted Items, Deleted Messages, Bin, Papierkorb, Gelöschte Elemente |
+
+- With the Gmail API, spam and trash are Gmail's own Spam and Trash labels.
+- With Outlook, they are the mailbox's Junk Email and Deleted Items folders.
+  Microsoft says which folders these are, so their names in your language
+  don't matter.
+
+`mailmd list folders` shows the result. Spam and trash have "no, left out by
+default" in the `SYNC` column. To copy such a folder, add it with
+`--include`. If your spam folder has another name and no flag, leave it out
+with `--exclude`.
 
 ## See what is in your archive
 

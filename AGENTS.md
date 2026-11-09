@@ -234,7 +234,9 @@ if the user agrees:
 - If a message the user expects is missing, run `mailmd list folders
   <account>`. It shows each folder on the server with its number of
   messages, and whether a sync copies it. Junk and Trash are left out by
-  default. `mailmd sync <account> --folder Junk --dry-run` says how many new
+  default. mailmd finds them by the server's special-use flag, or else by
+  the folder name, as [docs/quickstart.md](docs/quickstart.md#which-folders-count-as-spam-and-trash)
+  explains. `mailmd sync <account> --folder Junk --dry-run` says how many new
   messages are in Junk without writing anything. If the user wants Junk
   copied on every sync, run `mailmd connect <provider> --account <account>
   --include Junk`.

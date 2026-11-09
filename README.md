@@ -156,9 +156,11 @@ The next sync fetches only new mail. It also updates the read and starred
 marks that changed. If you stop a sync with Ctrl-C, the files saved so far
 stay, and the next run continues from there.
 
-mailmd leaves out spam and trash by default. For a Gmail address over IMAP,
-it syncs only `[Gmail]/All Mail`. You get one copy of every message,
-including mail you archived, but no separate Inbox or Sent folder
+mailmd leaves out spam and trash by default. [Which folders count as spam
+and trash](docs/quickstart.md#which-folders-count-as-spam-and-trash) says how
+it finds them. For a Gmail address over IMAP, it syncs only
+`[Gmail]/All Mail`. You get one copy of every message, including mail you
+archived, but no separate Inbox or Sent folder
 ([details](docs/imap.md#gmail-over-imap)).
 
 To change what a sync copies, give these flags to `mailmd connect` with the
