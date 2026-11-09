@@ -78,9 +78,10 @@ environment variable like `SSL_CERT_FILE`.
 
 If the user wants the mail somewhere other than `~/mail`, add `--out <folder>`.
 If the user wants mailmd's settings and login in a folder of their own, set
-`MAILMD_CONFIG_ROOT=<folder>` on every mailmd command, instead of
-`--config-root`. A scheduled job and the note for later sessions need the
-same variable.
+the `MAILMD_CONFIG_ROOT` environment variable to that folder. If your shell
+keeps variables between commands, export it once. Otherwise put it in front
+of each command, like `MAILMD_CONFIG_ROOT=<folder> mailmd sync`. A scheduled
+job and the note for later sessions need the same variable.
 To leave out folders or older mail, add `--exclude <folder>` or
 `--since <age>`, like `--since 2y`. mailmd saves these settings.
 

@@ -184,8 +184,8 @@ To copy a folder that is left out by default, name it for one sync, like: mailmd
 ```
 
 `mailmd status` shows what is in each archive and when it was last synced.
-Here the archive has mail in 3 folders. The sync checked 4, because Drafts
-is empty:
+The sync checked 4 folders, and Drafts was empty, so the archive has mail in
+3 of them:
 
 ```text
 work (IMAP, dana@fastmail.com)
