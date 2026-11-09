@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -491,6 +492,9 @@ func TestOfflineConformance(t *testing.T) {
 		t.Fatal(err)
 	}
 	exe := filepath.Join(t.TempDir(), "mailmd-offline")
+	if runtime.GOOS == "windows" {
+		exe += ".exe"
+	}
 	build := exec.Command("go", "build", "-tags", "mailmd_mock", "-o", exe, "./cmd/mailmd")
 	build.Dir = filepath.Join("..", "..")
 	if output, err := build.CombinedOutput(); err != nil {
@@ -698,7 +702,7 @@ func TestChangingSettingsKeepsTheOAuthLogin(t *testing.T) {
 			return nil
 		}
 		code, stdout, stderr := invoke(t, opts, "", "connect", "gmail", "--out", "~/archive", "--since", "2y")
-		if code != 0 || !strings.Contains(stdout, "Changed the settings of gmail (dana@gmail.example) and kept its saved login.") || !strings.Contains(stdout, "Mail goes to ~/archive/gmail.") {
+		if code != 0 || !strings.Contains(stdout, "Changed the settings of gmail (dana@gmail.example) and kept its saved login.") || !strings.Contains(stdout, filepath.FromSlash("Mail goes to ~/archive/gmail.")) {
 			t.Fatalf("change %d %s %s", code, stdout, stderr)
 		}
 		sweep(t, stdout, stderr)

@@ -61,7 +61,7 @@ func TestSyncAllAccountsIntoTheDefaultRoot(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("sync %d %s %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"one: mailmd checked INBOX and saved 3 new messages to ~/mail/one in", "two: mailmd checked INBOX and saved 3 new messages"} {
+	for _, want := range []string{filepath.FromSlash("one: mailmd checked INBOX and saved 3 new messages to ~/mail/one in"), "two: mailmd checked INBOX and saved 3 new messages"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
 		}
@@ -80,13 +80,13 @@ func TestSyncAllAccountsIntoTheDefaultRoot(t *testing.T) {
 		t.Fatalf("a quiet sync with nothing to report printed %q", stdout)
 	}
 	_, stdout, _ = invoke(t, opts, "", "status")
-	for _, want := range []string{"one (mock)", "Archive    ~/mail/one", "Messages   3 in 1 folder", "Last sync  just now, completed, checked INBOX"} {
+	for _, want := range []string{"one (mock)", filepath.FromSlash("Archive    ~/mail/one"), "Messages   3 in 1 folder", "Last sync  just now, completed, checked INBOX"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("status is missing %q:\n%s", want, stdout)
 		}
 	}
 	code, stdout, _ = invoke(t, opts, "", "list", "accounts")
-	if code != 0 || !strings.Contains(stdout, "NAME") || !strings.Contains(stdout, "~/mail/two") {
+	if code != 0 || !strings.Contains(stdout, "NAME") || !strings.Contains(stdout, filepath.FromSlash("~/mail/two")) {
 		t.Fatalf("list %d %s", code, stdout)
 	}
 }
@@ -412,7 +412,7 @@ func TestGmailSummaryDoesNotCountItsOneScopeAsAFolder(t *testing.T) {
 		Folders: []mdsync.FolderResult{{Path: mdsync.AllMailPath, Status: "synced", New: 13}}}
 	var out bytes.Buffer
 	renderSyncResult(&out, r, "/home/dana", false)
-	if want := "mailmd checked all mail and saved 13 new messages to ~/mail/personal in 7 s.\n"; out.String() != want {
+	if want := filepath.FromSlash("mailmd checked all mail and saved 13 new messages to ~/mail/personal in 7 s.\n"); out.String() != want {
 		t.Fatalf("got %q, want %q", out.String(), want)
 	}
 	r.New, r.Folders[0].New = 0, 0

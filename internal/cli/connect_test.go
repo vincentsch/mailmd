@@ -72,7 +72,7 @@ func TestConnectIMAPHumanOutputAndSavedSettings(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("connect %d %s %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"Connected work (dana@example.com).", "so mailmd syncs only that folder", "Mail goes to ~/archive/work.", "Next: mailmd sync work"} {
+	for _, want := range []string{"Connected work (dana@example.com).", "so mailmd syncs only that folder", filepath.FromSlash("Mail goes to ~/archive/work."), "Next: mailmd sync work"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
 		}
@@ -292,7 +292,7 @@ func TestConnectIMAPWithACAFile(t *testing.T) {
 		t.Fatalf("without the CA file: %d %s", code, stderr)
 	}
 	code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin", "--ca-file", "~/company-ca.pem")...)
-	if code != 0 || !strings.Contains(stdout, "mailmd trusts the certificate authority in ~/company-ca.pem") {
+	if code != 0 || !strings.Contains(stdout, filepath.FromSlash("mailmd trusts the certificate authority in ~/company-ca.pem")) {
 		t.Fatalf("connect: %d %s %s", code, stdout, stderr)
 	}
 	r, _ := accounts.Load(root)
@@ -359,7 +359,7 @@ func TestChangingSettingsKeepsTheSavedPassword(t *testing.T) {
 	registry := filepath.Join(root, "mailmd", "accounts.json")
 	before, _ := os.ReadFile(registry)
 	code, stdout, stderr := invoke(t, opts, "", "connect", "imap", "--account", "work", "--folder", "INBOX", "--out", "~/archive", "--dry-run", "--no-prompt")
-	if code != 0 || !strings.Contains(stdout, "The saved password still works. Nothing was saved because of --dry-run.") || !strings.Contains(stdout, "Mail goes to ~/archive/work.") {
+	if code != 0 || !strings.Contains(stdout, "The saved password still works. Nothing was saved because of --dry-run.") || !strings.Contains(stdout, filepath.FromSlash("Mail goes to ~/archive/work.")) {
 		t.Fatalf("dry run %d %s %s", code, stdout, stderr)
 	}
 	if after, _ := os.ReadFile(registry); string(after) != string(before) {
@@ -415,7 +415,7 @@ func TestANewOutSaysWhereTheArchivedMailIs(t *testing.T) {
 		t.Fatalf("sync %d %s %s", code, stdout, stderr)
 	}
 	old, moved := filepath.Join(home, "mail", "work"), filepath.Join(home, "Documents", "mail", "work")
-	note := "mailmd doesn't move the mail that is already archived in ~/mail/work. Move that folder into ~/Documents/mail before the next sync."
+	note := filepath.FromSlash("mailmd doesn't move the mail that is already archived in ~/mail/work. Move that folder into ~/Documents/mail before the next sync.")
 	_, stdout, _ := invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/Documents/mail", "--dry-run")
 	if !strings.Contains(stdout, note) {
 		t.Fatalf("dry run:\n%s", stdout)
@@ -447,7 +447,7 @@ func TestANewOutSaysWhereTheArchivedMailIs(t *testing.T) {
 	}
 	invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/mail")
 	_, stdout, _ = invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/Documents/mail")
-	if !strings.Contains(stdout, "~/mail/work still has the mail that was archived there. mailmd no longer uses that folder and leaves it as it is.") {
+	if !strings.Contains(stdout, filepath.FromSlash("~/mail/work still has the mail that was archived there. mailmd no longer uses that folder and leaves it as it is.")) {
 		t.Fatalf("both folders have files:\n%s", stdout)
 	}
 }

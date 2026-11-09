@@ -73,7 +73,7 @@ func TestConnectingAgainLeavesTheSavedSettings(t *testing.T) {
 		t.Fatal(e)
 	}
 	want, e := Update(root, "work", func(a *AccountConfig) {
-		a.Root, a.Folders, a.Include, a.Exclude, a.Since, a.KeepRaw, a.PreferText = "/archive", []string{"INBOX"}, []string{"Junk"}, []string{"Spam"}, "12m", true, true
+		a.Root, a.Folders, a.Include, a.Exclude, a.Since, a.KeepRaw, a.PreferText = filepath.Join(root, "archive"), []string{"INBOX"}, []string{"Junk"}, []string{"Spam"}, "12m", true, true
 	})
 	if e != nil {
 		t.Fatal(e)

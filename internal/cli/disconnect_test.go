@@ -54,7 +54,16 @@ func TestDisconnectDeletesTheLoginAndKeepsTheArchive(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("dry run %d %s %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"mailmd would remove work from its account list and delete these files:", login, "last-sync.json", "The archive in " + shown + " stays as it is. Nothing was changed because of --dry-run."} {
+	// mailmd resolves the config folder, which on Windows turns a short
+	// temp name like RUNNER~1 into the long one.
+	resolved := login
+	if real, err := filepath.EvalSymlinks(root); err == nil {
+		resolved = filepath.Join(real, "mailmd", "work", "mock.json")
+	}
+	if !strings.Contains(stdout, login) && !strings.Contains(stdout, resolved) {
+		t.Fatalf("dry run output is missing %q:\n%s", login, stdout)
+	}
+	for _, want := range []string{"mailmd would remove work from its account list and delete these files:", "last-sync.json", "The archive in " + shown + " stays as it is. Nothing was changed because of --dry-run."} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("dry run output is missing %q:\n%s", want, stdout)
 		}
@@ -70,7 +79,10 @@ func TestDisconnectDeletesTheLoginAndKeepsTheArchive(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("disconnect %d %s %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"Disconnected work. mailmd removed it from its account list and deleted these files:", login, "The archive in " + shown + " stays as it is.\n"} {
+	if !strings.Contains(stdout, login) && !strings.Contains(stdout, resolved) {
+		t.Fatalf("output is missing %q:\n%s", login, stdout)
+	}
+	for _, want := range []string{"Disconnected work. mailmd removed it from its account list and deleted these files:", "The archive in " + shown + " stays as it is.\n"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
 		}

@@ -107,7 +107,7 @@ func TestFolderCountsAgreeAndADryRunCountsNewMail(t *testing.T) {
 	if code != 0 || !strings.Contains(stdout, "The mailbox has 6 folders. A sync copies 4 of them and leaves out Junk and Trash.") {
 		t.Fatalf("connect %d %s %s", code, stdout, stderr)
 	}
-	if _, stdout, _ = invoke(t, opts, "", "sync"); !strings.Contains(stdout, "mailmd checked 4 folders and saved 4 new messages to ~/mail/work") {
+	if _, stdout, _ = invoke(t, opts, "", "sync"); !strings.Contains(stdout, filepath.FromSlash("mailmd checked 4 folders and saved 4 new messages to ~/mail/work")) {
 		t.Fatalf("sync:\n%s", stdout)
 	}
 	_, stdout, _ = invoke(t, opts, "", "status", "work")
@@ -115,7 +115,7 @@ func TestFolderCountsAgreeAndADryRunCountsNewMail(t *testing.T) {
 		t.Fatalf("status:\n%s", stdout)
 	}
 	_, stdout, _ = invoke(t, opts, "", "sync", "work", "--folder", "Junk", "--dry-run")
-	if !strings.Contains(stdout, "mailmd checked Junk and would save 1 new message to ~/mail/work. Nothing was written because of --dry-run.") {
+	if !strings.Contains(stdout, filepath.FromSlash("mailmd checked Junk and would save 1 new message to ~/mail/work. Nothing was written because of --dry-run.")) {
 		t.Fatalf("dry run of Junk:\n%s", stdout)
 	}
 	_, stdout, _ = invoke(t, opts, "", "sync", "work", "--folder", "Trash", "--dry-run")
