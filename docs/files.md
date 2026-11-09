@@ -234,12 +234,13 @@ Each account folder has an `index.jsonl` file with one JSON object per line,
 one for each message file, newest first:
 
 ```json
-{"date":"2026-10-21T11:00:00+01:00","from":"Northwind Studio <billing@studio.example>","subject":"Invoice 2026-114 for October","folder":"Work/Clients","flags":["seen"],"thread":"<invoice-114@studio.example>","message_id":"<invoice-114@studio.example>","attachments":2,"ref":"1729000000:412","path":"Work/Clients/2026/2026-10-21-invoice-2026-114-for-october--906396084b0bb319.md"}
+{"date":"2026-10-21T11:00:00+01:00","from":"Northwind Studio <billing@studio.example>","to":["dana@example.com"],"subject":"Invoice 2026-114 for October","folder":"Work/Clients","flags":["seen"],"thread":"<invoice-114@studio.example>","message_id":"<invoice-114@studio.example>","attachments":2,"ref":"1729000000:412","path":"Work/Clients/2026/2026-10-21-invoice-2026-114-for-october--906396084b0bb319.md"}
 ```
 
 | Field | What it holds |
 | --- | --- |
 | `date`, `from`, `subject`, `folder`, `labels`, `flags` | The same as in the frontmatter |
+| `to` | The recipients, as a list in the same form as `to` in the frontmatter |
 | `thread`, `message_id` | The same as `thread_id` and `message_id` |
 | `attachments` | The number of attachments |
 | `omitted_bytes` | The size of a message saved with its headers only |
@@ -262,6 +263,8 @@ jq -r 'select((.from // "") | test("northwind"; "i")) | "\(.date) \(.subject)"' 
 jq -r 'select(.folder == "INBOX" and ((.flags // []) | index("seen") | not)) | .path' index.jsonl
 # All messages of one thread, oldest first
 jq -r 'select(.thread == "<q4-plan@acme.example>") | .path' index.jsonl | tac
+# Mail you sent to Bob
+jq -r 'select(.folder == "Sent" and any(.to[]?; test("bob@"; "i"))) | "\(.date) \(.subject)"' index.jsonl
 ```
 
 ## When things change on the server

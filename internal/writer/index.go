@@ -14,9 +14,11 @@ import (
 // IndexEntry is one line of an account's index.jsonl. Scripts and coding
 // agents can search this one file instead of opening every message.
 type IndexEntry struct {
-	Date    string `json:"date,omitempty"`
-	From    string `json:"from,omitempty"`
-	Subject string `json:"subject,omitempty"`
+	Date string `json:"date,omitempty"`
+	From string `json:"from,omitempty"`
+	// To lists the recipients, like the frontmatter's to.
+	To      []string `json:"to,omitempty"`
+	Subject string   `json:"subject,omitempty"`
 	// Folder is the provider's folder, like "INBOX" or "Work/Clients".
 	Folder      string   `json:"folder"`
 	Labels      []string `json:"labels,omitempty"`
@@ -52,6 +54,7 @@ func IndexEntries(m mail.Message, result WriteResult) []IndexEntry {
 		out = append(out, IndexEntry{
 			Date:        date,
 			From:        mail.FormatAddress(m.From),
+			To:          mail.FormatAddressList(m.To),
 			Subject:     m.Subject,
 			Folder:      folder,
 			Labels:      m.Labels,
@@ -125,6 +128,9 @@ func readFrontmatter(file, rel string) (IndexEntry, string, bool) {
 			continue
 		case "flags":
 			entry.Flags, _ = parseFlowList(raw)
+			continue
+		case "to":
+			entry.To, _ = parseFlowList(raw)
 			continue
 		case "labels":
 			entry.Labels, _ = parseFlowList(raw)

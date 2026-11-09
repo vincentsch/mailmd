@@ -51,9 +51,9 @@ them.
 ## Tips
 
 For questions about many messages, point the agent at `index.jsonl`. It has
-one line per message with its sender and subject, so the agent can filter it
-with `jq` or `rg` before it opens any file. [The file
-format](files.md#indexjsonl) lists the fields.
+one line per message with its sender and subject, and `to` lists the
+recipients. So the agent can filter it with `jq` or `rg` before it opens any
+file. [The file format](files.md#indexjsonl) lists the fields.
 
 Each file starts with lines like `from:` and `date:`. So a search like
 `rg -il '^from: .*northwind' ~/mail/work` finds all mail from a sender.

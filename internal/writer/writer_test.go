@@ -513,3 +513,23 @@ func TestEmptyBodyHasNoDoubleBlankLine(t *testing.T) {
 		t.Fatalf("file:\n%q", got)
 	}
 }
+
+func TestIndexEntryHasTheRecipientsAndSurvivesARebuild(t *testing.T) {
+	root := t.TempDir()
+	msg := plainMessage(time.UTC)
+	msg.Folders = []string{"INBOX"}
+	msg.To = []mail.Address{{Name: "Dana Reyes", Email: "dana@example.com"}, {Email: "bob@example.com"}}
+	result, err := WriteMessage(context.Background(), Options{Root: root, Account: "Acct"}, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	written := IndexEntries(msg, result)[0]
+	if !reflect.DeepEqual(written.To, []string{"Dana Reyes <dana@example.com>", "bob@example.com"}) {
+		t.Fatalf("to = %q", written.To)
+	}
+	// A lost index is built again from the files, with the same lines.
+	read, ok := ReadIndexEntry(result.Files[0].Path, written.Path)
+	if !ok || !reflect.DeepEqual(read, written) {
+		t.Fatalf("from the file:\n%+v\nwritten:\n%+v", read, written)
+	}
+}
