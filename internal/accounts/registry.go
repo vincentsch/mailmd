@@ -54,9 +54,10 @@ type AccountConfig struct {
 	// Root is the folder that holds the account's archive directory. Empty
 	// means DefaultRoot.
 	Root string `json:"root,omitempty"`
-	// Folders, Exclude and Since are the sync filters saved with connect.
-	// Flags given to sync replace them for that run.
+	// Folders, Include, Exclude and Since are the sync filters saved with
+	// connect. Flags given to sync replace them for that run.
 	Folders []string `json:"folders,omitempty"`
+	Include []string `json:"include,omitempty"`
 	Exclude []string `json:"exclude,omitempty"`
 	Since   string   `json:"since,omitempty"`
 	// KeepRaw also saves the original of each message as an .eml file.
@@ -264,7 +265,7 @@ func Connect(ctx context.Context, root, name, kind string, setup Setup, hooks pr
 		email = old.Email
 	}
 	a := AccountConfig{Name: name, Backend: kind, Email: email, ArchiveDir: dir, CredentialRef: dir + "/" + file, Settings: settings,
-		Root: old.Root, Folders: old.Folders, Exclude: old.Exclude, Since: old.Since, KeepRaw: old.KeepRaw, PreferText: old.PreferText}
+		Root: old.Root, Folders: old.Folders, Include: old.Include, Exclude: old.Exclude, Since: old.Since, KeepRaw: old.KeepRaw, PreferText: old.PreferText}
 	found := false
 	for i := range r.Accounts {
 		if r.Accounts[i].Name == name {

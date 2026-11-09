@@ -198,12 +198,13 @@ flags: ["seen"]
 Spam and trash are left out by default. Important is never used as a folder,
 because Gmail adds it to mail that already has another label.
 
-`--exclude` and `--folder` work on labels. A message is left out when one of
-its labels is excluded. `--folder Work` syncs only messages with the label
+The folder flags work on labels. A message is left out when one of its
+labels is excluded. `--folder Work` syncs only messages with the label
 `Work` or one of its sublabels, and `--folder Archive` syncs the messages
-without any label. When you change these filters, the next sync goes through
-all messages again, so it finds the ones the old filter left out. Messages
-you already have are not written again.
+without any label. `--include Spam` also syncs the messages in spam, and the
+rest stays as it is. When you change these filters, the next sync goes
+through all messages again, so it finds the ones the old filter left out.
+Messages you already have are not written again.
 
 A message stays in the folder where mailmd first saved it. When its labels
 change later, for example because you archived it, mailmd updates the labels

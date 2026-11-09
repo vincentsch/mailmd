@@ -73,13 +73,13 @@ func TestConnectingAgainLeavesTheSavedSettings(t *testing.T) {
 		t.Fatal(e)
 	}
 	want, e := Update(root, "work", func(a *AccountConfig) {
-		a.Root, a.Folders, a.Exclude, a.Since, a.KeepRaw, a.PreferText = "/archive", []string{"INBOX"}, []string{"Spam"}, "12m", true, true
+		a.Root, a.Folders, a.Include, a.Exclude, a.Since, a.KeepRaw, a.PreferText = "/archive", []string{"INBOX"}, []string{"Junk"}, []string{"Spam"}, "12m", true, true
 	})
 	if e != nil {
 		t.Fatal(e)
 	}
 	got, e := Connect(ctx, root, "work", "mock", mockSetup(root, "secret-two"), privatefs.Hooks{})
-	if e != nil || got.Root != want.Root || got.Since != want.Since || !got.KeepRaw || !got.PreferText || len(got.Folders) != 1 || len(got.Exclude) != 1 {
+	if e != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("after connecting again = %+v, %v", got, e)
 	}
 }

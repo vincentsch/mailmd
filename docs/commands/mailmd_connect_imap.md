@@ -14,6 +14,7 @@ mailmd connect imap
 mailmd connect imap --email you@fastmail.com
 mailmd connect imap --account work --host imap.example.com --username you@example.com
 printf '%s\n' "$PASSWORD" | mailmd connect imap --email you@example.com --host imap.example.com --password-stdin
+mailmd connect imap --account work --include Junk
 mailmd connect imap --account work --out ~/Documents/mail
 mailmd connect imap --account work
 ```
@@ -24,8 +25,9 @@ mailmd connect imap --account work
 - `--ca-file` PEM file with the certificate of your server's own certificate authority. mailmd trusts it in addition to the system's certificates and saves it with the account
 - `--email` Your email address. mailmd fills in the server settings of known providers
 - `--exclude` Leave out this folder and its subfolders. mailmd saves it with the account (repeat for more)
-- `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*'. mailmd saves it with the account (repeat for more)
+- `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*', instead of the default folders. mailmd saves it with the account (repeat for more)
 - `--host` IMAP server, like imap.example.com
+- `--include` Also sync this folder, like Junk, and keep the default folders. mailmd saves it with the account (repeat for more)
 - `--keep-raw` Also save each original message as an .eml file next to its Markdown file
 - `--out` Folder for the archive (default: ~/mail)
 - `--password-stdin` Read the password from the first line of standard input

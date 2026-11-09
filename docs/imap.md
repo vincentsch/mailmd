@@ -130,7 +130,8 @@ two folders. Mail you archived has no label and is only in
 - The files don't say which labels a message has. Gmail's IMAP server shows
   labels only through an extension that mailmd doesn't use.
 - Spam and trash are not in All Mail. mailmd leaves them out, as it does for
-  every other provider.
+  every other provider. To copy the spam folder too, add
+  `--include '[Gmail]/Spam'`.
 
 If you want the labels, use [the Gmail API](gmail.md) instead. It also saves
 each message once, in a folder like Inbox or Sent, and lists all its labels
@@ -145,7 +146,8 @@ mailmd connect imap --email you@gmail.com --folder INBOX --folder '[Gmail]/Sent 
 Each label is then synced as its own folder. A message with two of these
 labels, like a message in your inbox that also has the label Work, is saved
 twice, once in each folder. Mail you archived without one of these labels is
-not synced at all.
+not synced at all. For the same reason, `--folder '*'` is a bad idea here. It
+copies All Mail and every label, so most messages are saved several times.
 
 ## Changing settings later
 

@@ -152,9 +152,10 @@ With `--since`, mailmd still lists every message of a folder, but fetches
 only those received on or after that day. Graph stops a filtered list at
 5,000 messages, so mailmd does the filtering itself.
 
-Junk Email and Deleted Items are left out unless you name them with
-`--folder`. mailmd finds them by their role in Graph, so this works in every
-mailbox language.
+Junk Email and Deleted Items are left out by default. mailmd finds them by
+their role in Graph, so this works in every mailbox language. To copy Junk
+Email on every sync, add it with `--include 'Junk Email'` on
+`mailmd connect outlook`.
 
 ## Removing access
 

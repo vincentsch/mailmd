@@ -159,7 +159,7 @@ func (m module) readConnectOptions(c *cobra.Command) (connectOptions, error) {
 			return connectOptions{}, err
 		}
 	}
-	opts.filter = mdsync.Filter{Folders: flagStrings(c, "folder"), Exclude: flagStrings(c, "exclude")}
+	opts.filter = mdsync.Filter{Folders: patterns(c, "folder"), Include: patterns(c, "include"), Exclude: patterns(c, "exclude")}
 	if err := opts.filter.Validate(); err != nil {
 		return connectOptions{}, newUserError(rg.ExitUsage, upperFirst(err.Error()), "")
 	}
@@ -167,6 +167,23 @@ func (m module) readConnectOptions(c *cobra.Command) (connectOptions, error) {
 		return connectOptions{}, newUserError(rg.ExitUsage, upperFirst(err.Error()), "")
 	}
 	return opts, nil
+}
+
+// patterns returns the folder patterns of a connect flag. An empty value
+// clears the list that is saved for the flag.
+func patterns(c *cobra.Command, name string) []string {
+	var out []string
+	for _, p := range flagStrings(c, name) {
+		if strings.TrimSpace(p) != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// savedFilter returns the folder filter saved with an account.
+func savedFilter(a accounts.AccountConfig) mdsync.Filter {
+	return mdsync.Filter{Folders: a.Folders, Include: a.Include, Exclude: a.Exclude}
 }
 
 // imapSettings collects the IMAP settings from flags, presets and prompts.
@@ -291,7 +308,7 @@ func (m module) passwordGiven(c *cobra.Command) bool {
 
 // settingFlags are the connect flags that change what a sync does. A
 // command that gives only these, and no new login, keeps the saved login.
-var settingFlags = []string{"out", "folder", "exclude", "since", "keep-raw", "prefer-text"}
+var settingFlags = []string{"out", "folder", "include", "exclude", "since", "keep-raw", "prefer-text"}
 
 // changesSettings reports whether the command gives one of the setting
 // flags, or one of the extra flags of a provider, like --ca-file for IMAP.
@@ -309,8 +326,16 @@ func applySettings(c *cobra.Command, opts connectOptions, a *accounts.AccountCon
 	if opts.archive != "" {
 		a.Root = opts.archive
 	}
-	if c.Flags().Changed("folder") || c.Flags().Changed("exclude") {
-		a.Folders, a.Exclude = opts.filter.Folders, opts.filter.Exclude
+	// Each folder flag replaces the list saved for it. So --include Junk
+	// keeps the saved --exclude.
+	if c.Flags().Changed("folder") {
+		a.Folders = opts.filter.Folders
+	}
+	if c.Flags().Changed("include") {
+		a.Include = opts.filter.Include
+	}
+	if c.Flags().Changed("exclude") {
+		a.Exclude = opts.filter.Exclude
 	}
 	if c.Flags().Changed("since") {
 		a.Since = opts.since
@@ -623,8 +648,8 @@ func cleanAddress(s string) string {
 	return s
 }
 
-// checkFolders makes sure each --folder pattern matches a folder, so a typo
-// is not saved.
+// checkFolders makes sure each --folder and --include pattern matches a
+// folder, so a typo is not saved.
 func checkFolders(opts connectOptions, a accounts.AccountConfig, folders []backend.Folder) error {
 	err := opts.filter.CheckMatches(folders)
 	if err == nil {
@@ -680,8 +705,7 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 		Address: a.Email, Archive: m.archiveOf(a), DryRun: dry, LeftOut: []string{},
 		CAFile: a.Settings.CAFile, Next: "mailmd sync " + a.Name,
 	}
-	filter := mdsync.Filter{Folders: a.Folders, Exclude: a.Exclude}
-	filter = filter.ForFolders(folders)
+	filter := savedFilter(a).ForFolders(folders)
 	for _, folder := range folders {
 		if !folder.Fetchable {
 			continue

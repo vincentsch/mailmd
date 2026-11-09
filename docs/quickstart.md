@@ -112,7 +112,7 @@ Syncing fastmail to ~/mail/fastmail
   Archive                  94 new
   INBOX                    412 new
   Sent                     118 new
-  Left out: Spam and Trash. Use --folder to sync them.
+  Left out: Spam and Trash. To copy one of them, give it to mailmd connect with --include.
 mailmd checked 3 folders and saved 624 new messages to ~/mail/fastmail in 12 s.
 ```
 
@@ -129,39 +129,83 @@ tells you about it.
 
 | What you want | Flag |
 | --- | --- |
+| Also copy a folder that is left out by default, like Junk | `--include Junk` |
 | Only some folders | `--folder INBOX --folder 'Work/*'` |
 | Leave out folders | `--exclude Newsletters` |
 | Only recent mail | `--since 12m` or `--since 2025-01-01` |
 | Also save the original message | `--keep-raw` |
 | The text part instead of converted HTML | `--prefer-text` |
 
-These flags work on `mailmd sync` for one run, and mailmd doesn't save them.
-On `sync`, `--folder` and `--exclude` replace the ones saved with the account
-for that run. Give the flags to `mailmd connect` to save them for the
-account. To change them later, run `mailmd connect` with the account name
-and the new flags. mailmd keeps the saved password or login.
+Give these flags to `mailmd connect` to save them for the account. You can
+do that when you first connect, or later with the account name. mailmd
+then keeps the saved password or login, so it doesn't ask for it:
 
-`--folder` also syncs a folder that is left out by default. So
-`mailmd sync fastmail --folder Spam` copies the spam folder once, and the
-next normal sync leaves it out again. Add `--dry-run` to see first how many
-new messages a sync would save. A dry run writes nothing.
+```sh
+mailmd connect imap --account fastmail --include Spam
+```
 
-A folder name also matches its subfolders, so `--exclude Work` also leaves
-out `Work/Clients`. Names are not case sensitive. If a `--folder` matches no
-folder, mailmd stops with an error that lists the folders the server has.
+```text
+Changed the settings of fastmail (you@fastmail.com) and kept its saved password.
+The mailbox has 5 folders. A sync copies 4 of them and leaves out Trash.
+Mail goes to ~/mail/fastmail.
+```
 
-`--since` goes by the day the server received a message. That can be later
-than the date in the message. If you moved to a new provider and copied your
-old mail over, that mail can count as received on the day of the move.
+`mailmd sync` takes the same flags, except `--include`, for one run. mailmd
+doesn't save them. On `sync`, `--folder` and `--exclude` replace the folder
+settings saved with the account for that run. So
+`mailmd sync fastmail --folder Spam` copies only the spam folder, once, and
+the next normal sync leaves it out again. Add `--dry-run` to see first how
+many new messages a sync would save. A dry run writes nothing.
 
 To see the folders on the server, run `mailmd list folders fastmail`. It
 shows how many messages each folder has and whether a sync copies it. For a
 folder that a sync leaves out, it also says why.
 
-Spam and trash are left out unless you name them with `--folder`. For a
-Gmail address over IMAP, mailmd syncs only `[Gmail]/All Mail`. That gives you
-one copy of every message, but no separate Inbox or Sent folder. The [IMAP
-guide](imap.md#gmail-over-imap) shows how to sync chosen labels instead.
+`--since` goes by the day the server received a message. That can be later
+than the date in the message. If you moved to a new provider and copied your
+old mail over, that mail can count as received on the day of the move.
+
+### How the folder flags work together
+
+Without folder settings, a sync copies every folder except spam and trash.
+For a Gmail address over IMAP, mailmd syncs only `[Gmail]/All Mail`. That
+gives you one copy of every message, but no separate Inbox or Sent folder.
+The [IMAP guide](imap.md#gmail-over-imap) shows how to sync chosen labels
+instead.
+
+The three folder flags change that:
+
+- `--include Junk` copies Junk in addition to the folders a sync copies
+  anyway. Use it when you want one more folder.
+- `--folder INBOX` copies only the folders you name. On `mailmd connect` this
+  means that from now on a sync copies only these folders, and folders you
+  create later on the server are left out. A folder you name is copied even
+  when it is left out by default, like Junk.
+- `--exclude Newsletters` leaves out a folder. It wins over `--folder` and
+  `--include`.
+
+You can repeat each flag for more folders. On `mailmd connect`, each flag
+replaces the list that is saved for it and keeps the others. So
+`--include Junk` keeps a saved `--exclude Newsletters`. To clear a saved
+list, give the flag an empty value, like `--folder ''`. With
+`--folder '' --include '' --exclude ''`, a sync copies the default folders
+again.
+
+This is how mailmd matches folder names:
+
+- A name matches the folder and all its subfolders. So `--exclude Work` also
+  leaves out `Work/Clients`. Names are not case sensitive.
+- `*` stands for any part of a name, but not for the `/` between a folder
+  and its subfolder. So `'Work/*'` matches `Work/Clients` and its
+  subfolders, but not `Work` itself. `--folder Work` copies Work and all its
+  subfolders.
+- `'*'` matches every folder. `--folder '*' --exclude Trash` copies all
+  folders except Trash, also Junk and folders you create later.
+- Put a name with `*` in single quotes, so that your shell doesn't change
+  it.
+
+If a `--folder` or `--include` matches no folder, mailmd stops with an error
+that lists the folders the server has. On `connect`, it saves nothing then.
 
 ## See what is in your archive
 

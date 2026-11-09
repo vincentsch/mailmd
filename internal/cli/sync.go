@@ -39,7 +39,8 @@ func (m module) syncCommand(cmd *rg.Command) {
 // saves them with the account, and sync uses them for one run.
 func addFilterFlags(c *cobra.Command, saved bool) {
 	if saved {
-		c.Flags().StringArray("folder", nil, "Sync only this folder and its subfolders, like INBOX or 'Work/*'. mailmd saves it with the account (repeat for more)")
+		c.Flags().StringArray("folder", nil, "Sync only this folder and its subfolders, like INBOX or 'Work/*', instead of the default folders. mailmd saves it with the account (repeat for more)")
+		c.Flags().StringArray("include", nil, "Also sync this folder, like Junk, and keep the default folders. mailmd saves it with the account (repeat for more)")
 		c.Flags().StringArray("exclude", nil, "Leave out this folder and its subfolders. mailmd saves it with the account (repeat for more)")
 	} else {
 		c.Flags().StringArray("folder", nil, "Sync only this folder and its subfolders in this run, like INBOX or Junk. It isn't saved (repeat for more)")
@@ -187,7 +188,9 @@ func (m module) syncOptions(f *rg.Factory, c *cobra.Command, root string, a acco
 	if err != nil {
 		return mdsync.Options{}, err
 	}
-	filter := mdsync.Filter{Folders: a.Folders, Exclude: a.Exclude}
+	filter := savedFilter(a)
+	// The folder flags of a sync replace the folders saved with the account
+	// for this run, also the saved --include.
 	if c.Flags().Changed("folder") || c.Flags().Changed("exclude") {
 		filter = mdsync.Filter{Folders: flagStrings(c, "folder"), Exclude: flagStrings(c, "exclude")}
 	}

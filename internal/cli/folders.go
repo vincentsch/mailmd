@@ -24,6 +24,8 @@ type FolderList struct {
 	// Included counts the folders that a sync copies.
 	Included int          `json:"included"`
 	Folders  []FolderItem `json:"folders"`
+	// connect is the connect command of the account, like imap.
+	connect string
 }
 
 // FolderItem is one folder on the server.
@@ -79,8 +81,8 @@ func (m module) listFolders(f *rg.Factory, c *cobra.Command, args []string) erro
 			return accountProblem(err, a)
 		}
 	}
-	list := FolderList{Schema: "mailmd-folder-list/1", Account: a.Name, Provider: providerName(a.Backend), Address: a.Email, Folders: []FolderItem{}}
-	filter := mdsync.Filter{Folders: a.Folders, Exclude: a.Exclude}.ForFolders(folders)
+	list := FolderList{Schema: "mailmd-folder-list/1", Account: a.Name, Provider: providerName(a.Backend), Address: a.Email, Folders: []FolderItem{}, connect: connectCommand(a.Backend)}
+	filter := savedFilter(a).ForFolders(folders)
 	for _, folder := range folders {
 		if !folder.Fetchable {
 			continue
@@ -132,8 +134,17 @@ func renderFolders(w io.Writer, list FolderList) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "A sync copies %d of these %s.\n", list.Included, plural(len(list.Folders), "folder", "folders"))
 	if byDefault != "" {
-		fmt.Fprintf(w, "To copy a folder that is left out by default, name it for one sync, like: mailmd sync %s --folder %s\n", shellWord(list.Account), shellWord(byDefault))
+		fmt.Fprintf(w, "To copy %s on every sync, run: mailmd connect %s --account %s --include %s\n", byDefault, list.connect, shellWord(list.Account), shellWord(byDefault))
+		fmt.Fprintf(w, "To copy it once, run: mailmd sync %s --folder %s\n", shellWord(list.Account), shellWord(byDefault))
 	}
+}
+
+// connectCommand returns the name of the connect command for a provider.
+func connectCommand(kind string) string {
+	if kind == "graph" {
+		return "outlook"
+	}
+	return kind
 }
 
 // oneAccount returns the named account. Without a name, it returns the only

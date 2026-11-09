@@ -110,6 +110,12 @@ var (
 	simpleModes = []string{rg.OutputModeHuman, rg.OutputModeJSON}
 )
 
+// folderHelp explains the folder flags of the connect commands.
+const folderHelp = "By default a sync copies every folder except spam and trash. --include Junk copies a folder in addition to those. " +
+	"--folder INBOX copies only the folders you name, from now on. --exclude Newsletters leaves out a folder, and it wins over the other two. " +
+	"Each of these flags replaces the list saved for it and keeps the others. An empty value, like --folder '', clears a saved list. " +
+	"A name also matches its subfolders, and 'Work/*' matches only the subfolders of Work."
+
 var specs = []spec{
 	{
 		path:    "connect",
@@ -130,6 +136,7 @@ var specs = []spec{
 			"In a terminal, it asks for anything that is missing, and then for the password in a hidden prompt.\n\n" +
 			"Scripts can pipe the password in with --password-stdin, or set MAILMD_IMAP_PASSWORD.\n\n" +
 			"If your server's certificate comes from your own certificate authority, give the authority's certificate with --ca-file. mailmd saves the file with the account and uses it for every sync.\n\n" +
+			folderHelp + "\n\n" +
 			"To change a setting of a connected account, give the account name and the new setting, like mailmd connect imap --account work --out ~/Documents/mail. " +
 			"mailmd keeps the saved password, also with --dry-run. It needs the password again only when you change the server or the login name. " +
 			"To enter a new password, give only the account name, like mailmd connect imap --account work.\n\n" +
@@ -138,6 +145,7 @@ var specs = []spec{
 			"mailmd connect imap --email you@fastmail.com",
 			"mailmd connect imap --account work --host imap.example.com --username you@example.com",
 			"printf '%s\\n' \"$PASSWORD\" | mailmd connect imap --email you@example.com --host imap.example.com --password-stdin",
+			"mailmd connect imap --account work --include Junk",
 			"mailmd connect imap --account work --out ~/Documents/mail",
 			"mailmd connect imap --account work",
 		},
@@ -154,7 +162,8 @@ var specs = []spec{
 			"mailmd prints the Google sign-in address, and in a terminal it also opens the address in your browser. " +
 			"On a computer without a browser, use --no-browser. After you sign in on another device, paste the address that the browser ends up on.\n\n" +
 			"To connect an account again, for example after its login ended, the account name is enough. mailmd then uses the client it saved, and a new --client-secret replaces it.\n\n" +
-			"To change a setting of a connected account, like --out or --folder, give the account name and the new setting. mailmd keeps the saved login and doesn't sign in again.",
+			"To change a setting of a connected account, like --out or --folder, give the account name and the new setting. mailmd keeps the saved login and doesn't sign in again.\n\n" +
+			folderHelp + " Here the folders are Gmail's labels, like Spam or Work.",
 		examples: []string{
 			"mailmd connect gmail --client-secret ~/Downloads/client_secret.json",
 			"mailmd connect gmail --account personal --client-secret client_secret.json --no-browser",
@@ -172,7 +181,8 @@ var specs = []spec{
 			"The Outlook guide shows how to create one: https://github.com/vincentsch/mailmd/blob/main/docs/outlook.md\n\n" +
 			"mailmd shows a code, and you enter it on Microsoft's sign-in page in any browser.\n\n" +
 			"To connect an account again, the account name is enough. mailmd then uses the saved client ID and tenant.\n\n" +
-			"To change a setting of a connected account, like --out or --folder, give the account name and the new setting. mailmd keeps the saved login and doesn't sign in again. A new --client-id or --tenant needs a new sign-in.",
+			"To change a setting of a connected account, like --out or --folder, give the account name and the new setting. mailmd keeps the saved login and doesn't sign in again. A new --client-id or --tenant needs a new sign-in.\n\n" +
+			folderHelp,
 		examples: []string{
 			"mailmd connect outlook --client-id 12345678-1234-1234-1234-123456789abc",
 			"mailmd connect outlook --account work --client-id 12345678-1234-1234-1234-123456789abc --tenant organizations",
@@ -202,7 +212,8 @@ var specs = []spec{
 		long: "Copy the new mail of your connected accounts into Markdown files. Without account names, mailmd syncs all accounts. " +
 			"Each run fetches only what is new since the last one. If you stop a sync with Ctrl-C, the files saved so far stay.\n\n" +
 			"Spam and trash are left out by default. For Gmail over IMAP, mailmd syncs only [Gmail]/All Mail, which has every message once. mailmd list folders shows which folders a sync copies.\n\n" +
-			"--folder and --exclude apply only to this run, and they replace the ones saved with the account. To save them, give them to mailmd connect. --folder also syncs a folder that is left out by default, so --folder Junk syncs Junk once.\n\n" +
+			"--folder and --exclude apply only to this run, and they replace the folder settings saved with the account. --folder also syncs a folder that is left out by default, so --folder Junk syncs Junk once. " +
+			"To copy Junk on every sync, run mailmd connect with the account name and --include Junk.\n\n" +
 			"With --dry-run, mailmd says how many new messages it would save and writes nothing.\n\n" +
 			"A message that was too large is saved with its headers only. When you raise --max-message-bytes above its size, the next sync fetches the full message. " +
 			"With --quiet, it prints only warnings and errors.",
@@ -248,7 +259,7 @@ var specs = []spec{
 		path:  "list folders",
 		short: "List the folders on the server",
 		long: "List the folders of an account as the server has them, with the number of messages in each. " +
-			"It also shows which folders a sync copies, and why it leaves out the others. Spam and trash are left out by default, and the --folder and --exclude settings saved with the account can leave out more.\n\n" +
+			"It also shows which folders a sync copies, and why it leaves out the others. Spam and trash are left out by default, and the folder settings saved with the account change that.\n\n" +
 			"mailmd connects to the provider to get the list. It only reads, and it changes nothing in the archive. Without an account name, it lists the folders of your only account.",
 		examples: []string{"mailmd list folders work", "mailmd list folders work --json"},
 		related:  []string{"sync", "connect"},

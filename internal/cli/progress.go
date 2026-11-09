@@ -95,7 +95,7 @@ func (p *progress) finish(r mdsync.Result) {
 		}
 	}
 	if len(left) > 0 {
-		fmt.Fprintf(p.w, "  Left out: %s. Use --folder to sync them.\n", joinNames(left))
+		fmt.Fprintf(p.w, "  Left out: %s. To copy one of them, give it to mailmd connect with --include.\n", joinNames(left))
 	}
 }
 

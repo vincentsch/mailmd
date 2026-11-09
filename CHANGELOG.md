@@ -13,7 +13,7 @@ First release of mailmd.
 - Remove an account and its saved login with `mailmd disconnect`. The archive stays. For Gmail and Outlook, mailmd says where to remove the app's access in your Google or Microsoft account.
 - Show each account's email address in `mailmd status` and `mailmd list accounts`. mailmd asks Gmail and Microsoft for it, and takes it from `--email` for IMAP.
 - Sync all accounts with `mailmd sync`, fetching only new mail and updating changed flags.
-- Choose folders with `--folder` and `--exclude`, and leave out older mail with `--since`.
+- Choose folders with `--folder` and `--exclude`, and leave out older mail with `--since`. `--include` adds a folder that is left out by default, like Junk, and keeps the other folders.
 - See the folders on the server with `mailmd list folders`, with the number of messages in each and whether a sync copies it.
 - Leave out spam and trash by default. For Gmail over IMAP, sync `[Gmail]/All Mail` alone, so each message is saved once, archived mail included.
 - Save messages larger than the size limit with their headers and a note, and replace them with the full message when a later sync has a higher limit.

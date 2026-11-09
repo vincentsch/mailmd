@@ -104,7 +104,7 @@ func Describe(err error, a accounts.AccountConfig) ErrorInfo {
 	switch info.Category {
 	case CategoryUnknownFolder:
 		errors.As(err, &unknown)
-		info.Message = fmt.Sprintf("--folder %q matches no folder of %s.", unknown.Pattern, a.Name)
+		info.Message = fmt.Sprintf("%s %q matches no folder of %s.", unknown.Flag, unknown.Pattern, a.Name)
 		info.Hint = "The folders are: " + strings.Join(unknown.Folders, ", ")
 	case CategoryCanceled:
 		info.Message = "The sync was interrupted."

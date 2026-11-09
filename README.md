@@ -152,17 +152,27 @@ The mail goes to `~/mail/<account>`, unless you chose another folder with
 updates the read and starred marks that changed. If you stop a sync with
 Ctrl-C, the files saved so far stay, and the next run continues from there.
 
-mailmd leaves out spam and trash unless you ask for them with `--folder`.
-For a Gmail address over IMAP, it syncs only `[Gmail]/All Mail`. You get one
-copy of every message, including mail you archived, but no separate Inbox or
-Sent folder ([details](docs/imap.md#gmail-over-imap)). You can pick folders
-with `--folder` and `--exclude`, and leave out older mail with `--since`. On
-`mailmd sync` these flags apply to one run. Give them to `mailmd connect` to
-save them for the account:
+mailmd leaves out spam and trash by default. For a Gmail address over IMAP,
+it syncs only `[Gmail]/All Mail`. You get one copy of every message,
+including mail you archived, but no separate Inbox or Sent folder
+([details](docs/imap.md#gmail-over-imap)).
+
+To change what a sync copies, give these flags to `mailmd connect` with the
+account name. mailmd saves them and keeps the saved password:
+
+- `--include Spam` copies a folder in addition to the default ones.
+- `--folder INBOX` copies only the folders you name, from now on.
+- `--exclude Newsletters` leaves out a folder.
+- `--since 12m` leaves out older mail.
 
 ```sh
-mailmd sync work --since 12m --exclude Newsletters
+mailmd connect imap --account work --include Spam --exclude Newsletters
 ```
+
+`mailmd sync` takes the same flags, except `--include`, for one run, like
+`mailmd sync work --folder Spam`. [How the folder flags work
+together](docs/quickstart.md#how-the-folder-flags-work-together) explains
+the details, like what `'Work/*'` matches.
 
 `mailmd list folders work` shows each folder on the server with its number
 of messages. It also says which folders a sync copies, and why it leaves out
@@ -180,7 +190,8 @@ work (IMAP, dana@fastmail.com)
   Trash    7         no, left out by default
 
 A sync copies 4 of these 6 folders.
-To copy a folder that is left out by default, name it for one sync, like: mailmd sync work --folder Spam
+To copy Spam on every sync, run: mailmd connect imap --account work --include Spam
+To copy it once, run: mailmd sync work --folder Spam
 ```
 
 `mailmd status` shows what is in each archive and when it was last synced.

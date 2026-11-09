@@ -83,7 +83,12 @@ keeps variables between commands, export it once. Otherwise put it in front
 of each command, like `MAILMD_CONFIG_ROOT=<folder> mailmd sync`. A scheduled
 job and the note for later sessions need the same variable.
 To leave out folders or older mail, add `--exclude <folder>` or
-`--since <age>`, like `--since 2y`. mailmd saves these settings.
+`--since <age>`, like `--since 2y`. To also copy a folder that is left out by
+default, like Junk, add `--include Junk`. mailmd saves these settings. Don't
+use `--folder` to add a folder. On connect, `--folder` means that a sync
+copies only the folders it names. [How the folder flags work
+together](docs/quickstart.md#how-the-folder-flags-work-together) explains
+the rules.
 
 ## 4. Let the user connect
 
@@ -120,7 +125,7 @@ so the user needs no client file or client ID for that.
 
 To change a setting later, like the folders a sync copies or the archive
 folder, run the connect command with `--account <name>` and the new
-setting, like `mailmd connect imap --account work --exclude Newsletters`.
+setting, like `mailmd connect imap --account work --include Junk`.
 mailmd keeps the saved password or login and asks for nothing, so you can
 run it yourself. Run it with `--dry-run` first and show the user what it
 says. Only another `--host` or `--username` needs the password again.
@@ -212,7 +217,9 @@ if the user agrees:
   <account>`. It shows each folder on the server with its number of
   messages, and whether a sync copies it. Junk and Trash are left out by
   default. `mailmd sync <account> --folder Junk --dry-run` says how many new
-  messages are in Junk without writing anything.
+  messages are in Junk without writing anything. If the user wants Junk
+  copied on every sync, run `mailmd connect <provider> --account <account>
+  --include Junk`.
 - Name the files you used, so the user can check them.
 
 [docs/files.md](docs/files.md) describes every field and file.

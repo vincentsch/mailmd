@@ -451,7 +451,7 @@ func (r *run) syncFolder(ctx context.Context, j job, request backend.FetchReques
 	fr := &r.result.Folders[j.result]
 	fs := r.state.folder(j.key)
 	request.ScopeKey, request.FolderPath = j.key, j.path
-	request.SkipJunk = len(r.opts.Filter.Folders) == 0
+	request.SkipJunk = r.filter.SkipsJunk(r.roles)
 	if fs.Since != "" {
 		request.Since, _ = time.Parse(time.DateOnly, fs.Since)
 	}

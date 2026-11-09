@@ -40,11 +40,16 @@ details. `mailmd disconnect <account>` deletes the file of one account.
 
 ## Can I sync only some of my mail?
 
-Yes. `--folder` and `--exclude` choose folders, and `--since` leaves out older
-mail, like `--since 12m` for the last 12 months. Give these flags to `mailmd
-connect` to save them for the account. On `mailmd sync`, they apply only to
-that run. Spam and trash are left out unless you name them with `--folder`.
-`mailmd list folders` shows which folders a sync copies.
+Yes. Give the flags to `mailmd connect` with the account name, and mailmd
+saves them for the account. `--exclude` leaves out a folder, and `--folder`
+makes a sync copy only the folders you name. `--since` leaves out older mail,
+like `--since 12m` for the last 12 months. Spam and trash are left out by
+default. `--include Spam` copies the spam folder too, and the other folders
+stay. On `mailmd sync`, the flags apply only to that run.
+`mailmd list folders` shows which folders a sync copies. [How the folder
+flags work
+together](quickstart.md#how-the-folder-flags-work-together) has the
+details.
 
 ## What happens when I delete a message on the server?
 

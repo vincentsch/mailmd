@@ -49,7 +49,8 @@ func TestListFoldersShowsCountsAndWhatASyncCopies(t *testing.T) {
 		"Junk     1         no, left out by default",
 		"Trash    0         no, left out by default",
 		"A sync copies 3 of these 6 folders.",
-		"like: mailmd sync work --folder Junk",
+		"To copy Junk on every sync, run: mailmd connect imap --account work --include Junk",
+		"To copy it once, run: mailmd sync work --folder Junk",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
@@ -131,5 +132,66 @@ func TestFolderCountsAgreeAndADryRunCountsNewMail(t *testing.T) {
 	}
 	if r, _ := accounts.Load(root); len(r.Accounts[0].Folders) != 0 {
 		t.Fatalf("sync saved --folder: %+v", r.Accounts[0])
+	}
+}
+
+// --include adds a folder to the default ones and keeps the other saved
+// folder settings. --folder on connect means only these folders, and an
+// empty value clears a saved list.
+func TestIncludeAddsAFolderAndKeepsTheDefaults(t *testing.T) {
+	server := imaptest.Start(t, imaptest.Options{Folders: officeFolders()})
+	root, home := t.TempDir(), t.TempDir()
+	opts := Options{ConfigRoot: root, HomeDir: home, RootCAs: server.CertPool()}
+	if code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin", "--exclude", "Archive")...); code != 0 {
+		t.Fatalf("connect %d %s %s", code, stdout, stderr)
+	}
+	connect := func(args ...string) string {
+		t.Helper()
+		code, stdout, stderr := invoke(t, opts, "", append([]string{"connect", "imap", "--account", "work"}, args...)...)
+		if code != 0 {
+			t.Fatalf("connect %v: %d %s %s", args, code, stdout, stderr)
+		}
+		return stdout
+	}
+	saved := func() accounts.AccountConfig {
+		r, _ := accounts.Load(root)
+		return r.Accounts[0]
+	}
+	if out := connect("--include", "junk"); !strings.Contains(out, "A sync copies 4 of them and leaves out Archive and Trash.") {
+		t.Fatalf("--include junk:\n%s", out)
+	}
+	if a := saved(); strings.Join(a.Include, ",") != "junk" || strings.Join(a.Exclude, ",") != "Archive" || len(a.Folders) != 0 {
+		t.Fatalf("saved = %+v", a)
+	}
+	_, stdout, _ := invoke(t, opts, "", "list", "folders")
+	if !strings.Contains(stdout, "Junk     1         yes") || !strings.Contains(stdout, "To copy Trash on every sync") {
+		t.Fatalf("list folders:\n%s", stdout)
+	}
+	if _, stdout, _ = invoke(t, opts, "", "sync"); !strings.Contains(stdout, "mailmd checked 4 folders and saved 4 new messages") {
+		t.Fatalf("sync:\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(home, "mail", "work", "Junk")); err != nil {
+		t.Fatalf("Junk was not copied: %v", err)
+	}
+	// A typo is not saved.
+	code, _, stderr := invoke(t, opts, "", "connect", "imap", "--account", "work", "--include", "Junkk")
+	if code != 1 || !strings.Contains(stderr, `--include "Junkk" matches no folder of work. Nothing was saved.`) {
+		t.Fatalf("typo: %d %s", code, stderr)
+	}
+	// --folder means only these folders, and the included ones.
+	if out := connect("--folder", "INBOX"); !strings.Contains(out, "A sync copies 2 of them and leaves out Archive, Drafts, Sent and Trash.") {
+		t.Fatalf("--folder INBOX:\n%s", out)
+	}
+	// An empty value clears a saved list. Then a sync copies the default
+	// folders again.
+	if out := connect("--folder", "", "--include", "", "--exclude", ""); !strings.Contains(out, "A sync copies 4 of them and leaves out Junk and Trash.") {
+		t.Fatalf("cleared:\n%s", out)
+	}
+	if a := saved(); len(a.Folders)+len(a.Include)+len(a.Exclude) != 0 {
+		t.Fatalf("saved = %+v", a)
+	}
+	// '*' names every folder, also the ones left out by default.
+	if out := connect("--folder", "*", "--exclude", "Trash"); !strings.Contains(out, "A sync copies 5 of them and leaves out Trash.") {
+		t.Fatalf("'*':\n%s", out)
 	}
 }

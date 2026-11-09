@@ -345,6 +345,48 @@ func TestDefaultExclusionsAndFolderFilters(t *testing.T) {
 	if got := statuses(mustRun(t, opts)); got["Spam"] != "synced" || got["Work"] != "excluded" || got["Work/Clients"] != "synced" || got["INBOX"] != "excluded" {
 		t.Fatalf("--folder spam --folder 'Work/*' = %v", got)
 	}
+	// --include adds a folder to the default ones, and --exclude wins.
+	opts = testOptions(t.TempDir(), testService(1, folders...))
+	opts.Filter = Filter{Include: []string{"spam"}, Exclude: []string{"Work/*"}}
+	if got := statuses(mustRun(t, opts)); got["Spam"] != "synced" || got["Trash"] != "excluded" || got["INBOX"] != "synced" || got["Work"] != "synced" || got["Work/Clients"] != "excluded" || got["Virtual/All"] != "excluded" {
+		t.Fatalf("--include spam --exclude 'Work/*' = %v", got)
+	}
+	// With --folder, a sync copies the named folders and the included ones.
+	opts = testOptions(t.TempDir(), testService(1, folders...))
+	opts.Filter = Filter{Folders: []string{"Work"}, Include: []string{"Trash"}}
+	if got := statuses(mustRun(t, opts)); got["Work"] != "synced" || got["Work/Clients"] != "synced" || got["Trash"] != "synced" || got["INBOX"] != "excluded" || got["Spam"] != "excluded" {
+		t.Fatalf("--folder Work --include Trash = %v", got)
+	}
+	// '*' names every folder, so the default exclusions don't apply.
+	opts = testOptions(t.TempDir(), testService(1, folders...))
+	opts.Filter = Filter{Folders: []string{"*"}, Exclude: []string{"trash"}}
+	if got := statuses(mustRun(t, opts)); got["Spam"] != "synced" || got["Virtual/All"] != "synced" || got["Work/Clients"] != "synced" || got["INBOX"] != "synced" || got["Trash"] != "excluded" {
+		t.Fatalf("--folder '*' --exclude trash = %v", got)
+	}
+}
+
+func TestIncludeKeepsSpamOfAMessageWithLabels(t *testing.T) {
+	roles := map[string]backend.Role{"INBOX": backend.RoleInbox, "Spam": backend.RoleJunk, "Trash": backend.RoleTrash}
+	if f := (Filter{}); f.KeepMessage([]string{"Spam"}, roles) || !f.SkipsJunk(roles) {
+		t.Fatal("the default filter keeps spam")
+	}
+	if f := (Filter{Include: []string{"spam"}}); !f.KeepMessage([]string{"Spam"}, roles) || f.KeepMessage([]string{"Trash"}, roles) || !f.KeepMessage([]string{"INBOX"}, roles) || f.SkipsJunk(roles) {
+		t.Fatal("--include spam doesn't keep spam, or keeps trash")
+	}
+	if f := (Filter{Include: []string{"INBOX"}}); !f.SkipsJunk(roles) {
+		t.Fatal("--include INBOX asks the provider for spam")
+	}
+	if f := (Filter{Folders: []string{"INBOX"}, Include: []string{"Spam"}}); !f.KeepMessage([]string{"Spam"}, roles) || f.KeepMessage([]string{"Trash"}, roles) {
+		t.Fatal("--folder INBOX --include Spam")
+	}
+	// A changed --include starts a shared scope over, like other filters.
+	if (Filter{}).fingerprint() == (Filter{Include: []string{"Spam"}}).fingerprint() {
+		t.Fatal("--include doesn't change the fingerprint")
+	}
+	err := Filter{Include: []string{"Junkk"}}.CheckMatches([]backend.Folder{{Path: "INBOX", Fetchable: true}})
+	if info := Describe(err, testAccount()); info.Message != `--include "Junkk" matches no folder of work.` {
+		t.Fatalf("a typo in --include: %+v", info)
+	}
 }
 
 func statuses(r Result) map[string]string {

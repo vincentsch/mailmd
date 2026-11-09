@@ -16,7 +16,10 @@ type Filter struct {
 	// Folders lists the folders to sync. Empty means all folders except the
 	// default exclusions.
 	Folders []string
-	// Exclude lists folders to leave out.
+	// Include lists folders to sync in addition, like Junk, which is left
+	// out by default.
+	Include []string
+	// Exclude lists folders to leave out. It wins over Folders and Include.
 	Exclude []string
 	// gmailAllMail is the path of All Mail on Gmail's IMAP server. Without
 	// --folder only that folder is synced, see ForFolders.
@@ -55,44 +58,52 @@ func (f Filter) GmailAllMail() string {
 	return f.gmailAllMail
 }
 
-// CheckMatches returns an error when a --folder pattern matches none of the
-// folders. Otherwise a typo would quietly sync nothing on each run.
+// CheckMatches returns an error when a --folder or --include pattern
+// matches none of the folders. Otherwise a typo would quietly sync nothing
+// on each run.
 func (f Filter) CheckMatches(folders []backend.Folder) error {
-	for _, pattern := range f.Folders {
-		found := false
-		for _, folder := range folders {
-			if folder.Fetchable && matchesAny([]string{pattern}, folder.Path) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			var names []string
+	for _, list := range []struct {
+		flag     string
+		patterns []string
+	}{{"--folder", f.Folders}, {"--include", f.Include}} {
+		for _, pattern := range list.patterns {
+			found := false
 			for _, folder := range folders {
-				if folder.Fetchable {
-					names = append(names, folder.Path)
+				if folder.Fetchable && matchesAny([]string{pattern}, folder.Path) {
+					found = true
+					break
 				}
 			}
-			return &UnknownFolderError{Pattern: pattern, Folders: names}
+			if !found {
+				var names []string
+				for _, folder := range folders {
+					if folder.Fetchable {
+						names = append(names, folder.Path)
+					}
+				}
+				return &UnknownFolderError{Flag: list.flag, Pattern: pattern, Folders: names}
+			}
 		}
 	}
 	return nil
 }
 
-// UnknownFolderError reports a --folder pattern that matches no folder.
+// UnknownFolderError reports a --folder or --include pattern that matches
+// no folder.
 type UnknownFolderError struct {
+	Flag    string
 	Pattern string
 	Folders []string
 }
 
 func (e *UnknownFolderError) Error() string {
-	return fmt.Sprintf("--folder %q matches no folder", e.Pattern)
+	return fmt.Sprintf("%s %q matches no folder", e.Flag, e.Pattern)
 }
 
 // fingerprint describes the filter for the state file. The case and the
 // order of the patterns don't change it.
 func (f Filter) fingerprint() string {
-	if len(f.Folders) == 0 && len(f.Exclude) == 0 {
+	if len(f.Folders) == 0 && len(f.Include) == 0 && len(f.Exclude) == 0 {
 		return ""
 	}
 	norm := func(list []string) string {
@@ -103,11 +114,15 @@ func (f Filter) fingerprint() string {
 		sort.Strings(out)
 		return strings.Join(out, "\x00")
 	}
-	return "folders=" + norm(f.Folders) + "\nexclude=" + norm(f.Exclude)
+	fp := "folders=" + norm(f.Folders) + "\nexclude=" + norm(f.Exclude)
+	if len(f.Include) > 0 {
+		fp += "\ninclude=" + norm(f.Include)
+	}
+	return fp
 }
 
 // defaultExcluded are the folder roles that a sync leaves out unless
-// --folder names them. These are spam and trash, and folders that only
+// --folder or --include names them. These are spam and trash, and folders that only
 // repeat messages of other folders, like Gmail's "All Mail" and "Important".
 var defaultExcluded = map[backend.Role]bool{
 	backend.RoleJunk:      true,
@@ -127,7 +142,7 @@ const (
 
 // Validate checks the patterns.
 func (f Filter) Validate() error {
-	for _, p := range append(append([]string(nil), f.Folders...), f.Exclude...) {
+	for _, p := range append(append(append([]string(nil), f.Folders...), f.Include...), f.Exclude...) {
 		if strings.TrimSpace(p) == "" {
 			return fmt.Errorf("a folder pattern is empty")
 		}
@@ -142,6 +157,9 @@ func (f Filter) Validate() error {
 func (f Filter) Excludes(folder string, role backend.Role) (bool, string) {
 	if matchesAny(f.Exclude, folder) {
 		return true, ReasonExcluded
+	}
+	if matchesAny(f.Include, folder) {
+		return false, ""
 	}
 	if len(f.Folders) > 0 {
 		if matchesAny(f.Folders, folder) {
@@ -163,20 +181,38 @@ func (f Filter) Excludes(folder string, role backend.Role) (bool, string) {
 
 // KeepMessage decides about a message that has several labels, like a Gmail
 // message. It is left out when one of its labels is excluded. Without
-// --folder, it is also left out when it is in spam or trash. With --folder,
-// it is synced only when --folder names one of its labels.
+// --folder, it is also left out when it is in spam or trash, unless
+// --include names that label. With --folder, it is synced only when --folder
+// or --include names one of its labels.
 func (f Filter) KeepMessage(labels []string, roles map[string]backend.Role) bool {
 	named := len(f.Folders) == 0
 	for _, folder := range labels {
-		role := roles[folder]
-		if matchesAny(f.Exclude, folder) || (len(f.Folders) == 0 && (role == backend.RoleJunk || role == backend.RoleTrash)) {
+		if matchesAny(f.Exclude, folder) {
 			return false
 		}
-		if matchesAny(f.Folders, folder) {
+		if matchesAny(f.Folders, folder) || matchesAny(f.Include, folder) {
 			named = true
+			continue
+		}
+		if role := roles[folder]; len(f.Folders) == 0 && (role == backend.RoleJunk || role == backend.RoleTrash) {
+			return false
 		}
 	}
 	return named
+}
+
+// SkipsJunk reports whether a sync can ask the provider to leave out spam
+// and trash, because the filter leaves them out anyway.
+func (f Filter) SkipsJunk(roles map[string]backend.Role) bool {
+	if len(f.Folders) > 0 {
+		return false
+	}
+	for folder, role := range roles {
+		if (role == backend.RoleJunk || role == backend.RoleTrash) && matchesAny(f.Include, folder) {
+			return false
+		}
+	}
+	return true
 }
 
 // matchesAny reports whether a pattern matches the folder or one of its
