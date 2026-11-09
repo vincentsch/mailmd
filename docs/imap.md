@@ -60,10 +60,36 @@ mailmd connect imap --account work --email you@example.com --host mail.example.c
 | `--tls` | `implicit` | Use `starttls` for servers on port 143 that upgrade the connection |
 | `--username` | your email address | Some servers want only the part before the @ |
 | `--account` | from the provider or the domain | Also the name of the archive folder |
+| `--ca-file` | | A PEM file with the certificate of your server's own certificate authority |
 
 mailmd always encrypts the connection. It checks the server's certificate
 against the certificates your system trusts, and there is no option to turn
 that off. It never sends a password over a connection that isn't encrypted.
+
+### A server with its own certificate authority
+
+Many companies sign the certificates of their servers with their own
+certificate authority (CA). Your system doesn't know that CA, so the check
+fails with "The TLS certificate of mail.example.com is not trusted". Give
+mailmd the CA's certificate as a PEM file:
+
+```sh
+mailmd connect imap --account work --email you@example.com --host mail.example.com --ca-file ~/company-ca.pem
+```
+
+mailmd then trusts that CA for this account, in addition to the
+certificates your system trusts. It saves the path of the file with the
+account and reads the file on every sync. So you don't have to change your
+system or set an environment variable, and your other accounts aren't
+affected. Leave the file where it is. If the server signed its certificate
+itself, give that certificate as the CA file.
+
+A PEM file starts with `-----BEGIN CERTIFICATE-----`. If you got a binary
+`.cer` or `.der` file, convert it first:
+
+```sh
+openssl x509 -inform der -in company-ca.cer -out company-ca.pem
+```
 
 ## How mailmd gets the password
 
@@ -127,9 +153,12 @@ Run `mailmd connect imap` again with the same `--account` name and the new
 settings. mailmd checks the new login before it replaces the old one. Your
 archive and its sync state stay as they are.
 
-For a new password, the account name is enough. mailmd takes the server and
-the login name from the saved account:
+For a new password, the account name is enough. mailmd takes the server,
+the login name and the CA file from the saved account:
 
 ```sh
 mailmd connect imap --account work
 ```
+
+To use another CA file, add `--ca-file` with the new file. To stop using
+one, add `--ca-file ''`.

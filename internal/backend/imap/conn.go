@@ -218,7 +218,7 @@ func tlsProblem(ctx context.Context, cfg Config, addr string, err error) error {
 	case errors.As(err, &unknown):
 		return &backend.Problem{
 			Text: fmt.Sprintf("The TLS certificate of %s is not trusted. It is not signed by a known certificate authority.", cfg.Host),
-			Hint: "If the server uses its own certificate, add its CA certificate to the certificates your system trusts.",
+			Hint: "If the certificate comes from your own certificate authority, connect again with --ca-file and the CA's certificate in a PEM file.",
 			Err:  ErrTLS,
 		}
 	case errors.As(err, &hostname):

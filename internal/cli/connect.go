@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -37,7 +38,9 @@ type ConnectResult struct {
 	// sync leaves out by default.
 	Folders int      `json:"folders"`
 	LeftOut []string `json:"left_out"`
-	Next    string   `json:"next"`
+	// CAFile is the saved PEM file with more certificates to trust.
+	CAFile string `json:"ca_file,omitempty"`
+	Next   string `json:"next"`
 	// Note is a provider-specific remark, such as Gmail's All Mail folder.
 	Note string `json:"note,omitempty"`
 }
@@ -51,6 +54,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().Int("port", 0, "IMAP port (default: 993, or 143 with --tls starttls)")
 		c.Flags().String("username", "", "Login name (default: the email address)")
 		c.Flags().String("tls", "implicit", "How to encrypt the connection: implicit or starttls")
+		c.Flags().String("ca-file", "", "PEM file with the certificate of your server's own certificate authority. mailmd trusts it in addition to the system's certificates and saves it with the account")
 		c.Flags().Bool("password-stdin", false, "Read the password from the first line of standard input")
 		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
 		addFilterFlags(c)
@@ -167,10 +171,10 @@ func (m module) readConnectOptions(c *cobra.Command) (connectOptions, error) {
 
 // imapSettings collects the IMAP settings from flags, presets and prompts.
 type imapSettings struct {
-	account, email, host, username, tls string
-	port                                int
-	preset                              presets.Preset
-	known                               bool
+	account, email, host, username, tls, caFile string
+	port                                        int
+	preset                                      presets.Preset
+	known                                       bool
 }
 
 func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) error {
@@ -191,6 +195,9 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 	if err != nil {
 		return connectError(err, "imap")
 	}
+	if s.caFile, err = m.caFile(c, registry, s.account); err != nil {
+		return err
+	}
 
 	// Everything else is checked. Only now mailmd asks for the password.
 	if s.known && s.preset.Password != "" && interactive {
@@ -202,11 +209,11 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 	}
 	f.RegisterSecret(password)
 
-	cfg := imap.Config{Host: s.host, Port: s.port, Username: s.username, Password: password, TLSMode: imap.TLSMode(s.tls), RootCAs: m.opts.RootCAs}
+	cfg := imap.Config{Host: s.host, Port: s.port, Username: s.username, Password: password, TLSMode: imap.TLSMode(s.tls), RootCAs: m.opts.RootCAs, CAFile: s.caFile}
 	if flagBool(c, "verbose") {
 		cfg.Log = f.Stderr
 	}
-	settings := accounts.Settings{Host: s.host, Port: s.port, Username: s.username, TLSMode: s.tls}
+	settings := accounts.Settings{Host: s.host, Port: s.port, Username: s.username, TLSMode: s.tls, CAFile: s.caFile}
 	// IMAP has no way to ask for the address. A login name without an @
 	// says nothing about it, so the address stays empty then.
 	email := s.email
@@ -351,6 +358,37 @@ func (m module) imapSettings(c *cobra.Command, registry accounts.Registry, inter
 		return s, newUserError(rg.ExitUsage, fmt.Sprintf("The account %s already exists and uses %s", old.Name, providerName(old.Backend)), "Choose another name with --account.")
 	}
 	return s, nil
+}
+
+// caFile returns the CA file for the account: the one from --ca-file, or
+// the one saved with the account. An empty --ca-file removes it. The file is
+// checked here, before mailmd asks for the password.
+func (m module) caFile(c *cobra.Command, registry accounts.Registry, account string) (string, error) {
+	if !c.Flags().Changed("ca-file") {
+		if old, err := registry.Find(account); err == nil && old.Backend == "imap" {
+			return old.Settings.CAFile, nil
+		}
+		return "", nil
+	}
+	value := strings.TrimSpace(flagString(c, "ca-file"))
+	if value == "" {
+		return "", nil
+	}
+	path, err := absPath(value, m.home())
+	if err != nil {
+		return "", err
+	}
+	if strings.ContainsAny(path, "\x00\r\n") {
+		return "", newUserError(rg.ExitUsage, "--ca-file is not a usable path", "")
+	}
+	if _, err := imap.CAPool(path, x509.NewCertPool()); err != nil {
+		var problem *backend.Problem
+		if errors.As(err, &problem) {
+			return "", newUserError(rg.ExitUsage, strings.TrimSuffix(problem.Text, "."), problem.Hint)
+		}
+		return "", err
+	}
+	return path, nil
 }
 
 // guessHost suggests imap.<domain> for an unknown provider.
@@ -526,7 +564,7 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 	result := ConnectResult{
 		Schema: "mailmd-connect/1", Account: a.Name, Backend: a.Backend, Provider: providerName(a.Backend),
 		Address: a.Email, Archive: filepath.Join(root, a.ArchiveDir), DryRun: dry, LeftOut: []string{},
-		Next: "mailmd sync " + a.Name,
+		CAFile: a.Settings.CAFile, Next: "mailmd sync " + a.Name,
 	}
 	filter = filter.ForFolders(folders)
 	for _, folder := range folders {
@@ -563,6 +601,9 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 		}
 		if result.Note != "" {
 			fmt.Fprintln(w, result.Note)
+		}
+		if result.CAFile != "" {
+			fmt.Fprintf(w, "mailmd trusts the certificate authority in %s for this account, in addition to the system's certificates.\n", shortPath(result.CAFile, home))
 		}
 		fmt.Fprintf(w, "Mail goes to %s.\n", shortPath(result.Archive, home))
 		if !dry {

@@ -83,6 +83,7 @@ func OpenBackend(ctx context.Context, a AccountConfig, opts OpenOptions) (backen
 			Password: cred.Password,
 			TLSMode:  imap.TLSMode(a.Settings.TLSMode),
 			RootCAs:  opts.RootCAs,
+			CAFile:   a.Settings.CAFile,
 			Log:      opts.Log,
 		})
 	case "gmail":

@@ -276,3 +276,68 @@ func TestConnectRejectsAFolderThatDoesNotExist(t *testing.T) {
 		t.Fatalf("sync: %d %s", code, stderr)
 	}
 }
+
+func TestConnectIMAPWithACAFile(t *testing.T) {
+	server := imaptest.Start(t, imaptest.Options{})
+	root, home, out := t.TempDir(), t.TempDir(), t.TempDir()
+	ca := filepath.Join(home, "company-ca.pem")
+	if err := os.WriteFile(ca, server.CertPEM(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// No RootCAs from the test, so mailmd trusts only the system's
+	// certificates and the CA file.
+	opts := Options{ConfigRoot: root, HomeDir: home}
+	code, _, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin")...)
+	if code == 0 || !strings.Contains(stderr, "is not trusted") || !strings.Contains(stderr, "--ca-file") {
+		t.Fatalf("without the CA file: %d %s", code, stderr)
+	}
+	code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin", "--ca-file", "~/company-ca.pem")...)
+	if code != 0 || !strings.Contains(stdout, "mailmd trusts the certificate authority in ~/company-ca.pem") {
+		t.Fatalf("connect: %d %s %s", code, stdout, stderr)
+	}
+	r, _ := accounts.Load(root)
+	if r.Accounts[0].Settings.CAFile != ca {
+		t.Fatalf("saved CA file = %q", r.Accounts[0].Settings.CAFile)
+	}
+	// Later commands use the saved file, with nothing in the environment.
+	if code, stdout, stderr = invoke(t, opts, "", "sync", "work", "--out", out, "--folder", "INBOX"); code != 0 {
+		t.Fatalf("sync: %d %s %s", code, stdout, stderr)
+	}
+	// A new password keeps the CA file.
+	if code, stdout, stderr = invoke(t, opts, server.Password()+"\n", "connect", "imap", "--account", "work", "--password-stdin"); code != 0 {
+		t.Fatalf("reconnect: %d %s %s", code, stdout, stderr)
+	}
+	if r, _ = accounts.Load(root); r.Accounts[0].Settings.CAFile != ca {
+		t.Fatalf("after reconnect the CA file is %q", r.Accounts[0].Settings.CAFile)
+	}
+	// When the file is gone, the sync says which file it needs.
+	if err := os.Rename(ca, ca+".old"); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr = invoke(t, opts, "", "sync", "work", "--out", out)
+	if code != 2 || !strings.Contains(stderr, "Cannot read the CA file "+ca+", because the file does not exist.") || !strings.Contains(stderr, "--ca-file") {
+		t.Fatalf("sync without the file: %d %s", code, stderr)
+	}
+}
+
+func TestConnectIMAPChecksTheCAFileBeforeThePassword(t *testing.T) {
+	dir := t.TempDir()
+	notPEM := filepath.Join(dir, "ca.der")
+	if err := os.WriteFile(notPEM, []byte{0x30, 0x82, 0x01}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	no := false
+	opts := Options{ConfigRoot: t.TempDir(), Interactive: &no, PasswordPrompt: func(context.Context, io.Reader, io.Writer, string) (string, error) {
+		t.Fatal("asked for the password")
+		return "", nil
+	}}
+	for file, want := range map[string]string{
+		filepath.Join(dir, "missing.pem"): "because the file does not exist",
+		notPEM:                            "has no certificate in PEM format",
+	} {
+		code, _, stderr := invoke(t, opts, "", "connect", "imap", "--email", "you@example.com", "--host", "imap.example.com", "--ca-file", file)
+		if code != 1 || !strings.Contains(stderr, want) {
+			t.Errorf("%s: %d %s, want %q", file, code, stderr, want)
+		}
+	}
+}

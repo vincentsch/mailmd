@@ -30,7 +30,12 @@ type Config struct {
 	Username string
 	Password string
 	TLSMode  TLSMode
-	RootCAs  *x509.CertPool
+	// RootCAs replaces the system's certificates. Tests use it. Nil means
+	// the system's certificates.
+	RootCAs *x509.CertPool
+	// CAFile names a PEM file with more certificates to trust, like the
+	// certificate of a company's own certificate authority.
+	CAFile string
 	// IdleTimeout is how long a read may wait for the next bytes. Zero means
 	// DefaultIdleTimeout.
 	IdleTimeout time.Duration
@@ -64,6 +69,13 @@ func Open(ctx context.Context, cfg Config) (*Backend, error) {
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if cfg.CAFile != "" {
+		pool, err := CAPool(cfg.CAFile, cfg.RootCAs)
+		if err != nil {
+			return nil, err
+		}
+		cfg.RootCAs = pool
 	}
 	client, c, err := dial(ctx, cfg)
 	if err != nil {

@@ -34,6 +34,9 @@ type Settings struct {
 	Port     int    `json:"port,omitempty"`
 	Username string `json:"username,omitempty"`
 	TLSMode  string `json:"tls_mode,omitempty"`
+	// CAFile is a PEM file with more certificates that an IMAP account
+	// trusts, as an absolute path.
+	CAFile   string `json:"ca_file,omitempty"`
 	ClientID string `json:"client_id,omitempty"`
 	Tenant   string `json:"tenant,omitempty"`
 }
@@ -127,7 +130,10 @@ func validate(r Registry) error {
 		if a.Backend == "imap" && (a.Settings.Host == "" || a.Settings.Username == "" || a.Settings.Port < 0 || a.Settings.Port > 65535 || (a.Settings.TLSMode != "implicit" && a.Settings.TLSMode != "starttls")) {
 			return ErrRegistry
 		}
-		if a.Backend != "imap" && (a.Settings.Host != "" || a.Settings.Username != "" || a.Settings.TLSMode != "" || a.Settings.Port != 0) {
+		if a.Backend != "imap" && (a.Settings.Host != "" || a.Settings.Username != "" || a.Settings.TLSMode != "" || a.Settings.Port != 0 || a.Settings.CAFile != "") {
+			return ErrRegistry
+		}
+		if a.Settings.CAFile != "" && (!filepath.IsAbs(a.Settings.CAFile) || strings.ContainsAny(a.Settings.CAFile, "\x00\r\n")) {
 			return ErrRegistry
 		}
 		if a.Backend != "graph" && (a.Settings.ClientID != "" || a.Settings.Tenant != "") {

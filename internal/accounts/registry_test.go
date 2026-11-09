@@ -247,3 +247,27 @@ func TestRemoveWorksWithoutALoginFile(t *testing.T) {
 		t.Fatalf("still listed: %+v", r.Accounts)
 	}
 }
+
+func TestRegistryAcceptsACAFileOnlyAsAnAbsolutePathForIMAP(t *testing.T) {
+	imap := AccountConfig{Name: "work", Backend: "imap", ArchiveDir: "work", CredentialRef: "work/imap.json",
+		Settings: Settings{Host: "imap.example.com", Port: 993, Username: "dana", TLSMode: "implicit"}}
+	abs, _ := filepath.Abs("ca.pem")
+	for _, tt := range []struct {
+		backend, file string
+		ok            bool
+	}{
+		{"imap", abs, true},
+		{"imap", "ca.pem", false},
+		{"imap", abs + "\n", false},
+		{"mock", abs, false},
+	} {
+		a := imap
+		a.Settings.CAFile = tt.file
+		if tt.backend == "mock" {
+			a.Backend, a.CredentialRef, a.Settings = "mock", "work/mock.json", Settings{CAFile: tt.file}
+		}
+		if err := validate(Registry{Schema: Schema, Accounts: []AccountConfig{a}}); (err == nil) != tt.ok {
+			t.Errorf("%s with %q: %v", tt.backend, tt.file, err)
+		}
+	}
+}

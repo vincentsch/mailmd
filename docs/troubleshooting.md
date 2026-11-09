@@ -120,11 +120,26 @@ without `--tls`.
 
 **"The TLS certificate of mail.example.com is not trusted."**
 
-The server uses a certificate that your system doesn't trust, like one that
-the server signed itself. mailmd has no option to turn this check off. Add the
-server's CA certificate to the certificates your system trusts. On Linux you
-can also point the `SSL_CERT_FILE` environment variable to a file that holds
-it.
+The server uses a certificate that your system doesn't trust, like one from
+your company's own certificate authority, or one that the server signed
+itself. mailmd has no option to turn this check off. Connect again with the
+CA's certificate as a PEM file:
+
+```sh
+mailmd connect imap --account work --ca-file ~/company-ca.pem
+```
+
+mailmd saves the file with the account and uses it for every sync. The [IMAP
+guide](imap.md#a-server-with-its-own-certificate-authority) has more.
+
+**"Cannot read the CA file ..."** or **"The CA file ... has no certificate in
+PEM format."**
+
+mailmd can't use the file you gave with `--ca-file`, or the file that the
+account saved. Check the path. If the file moved, connect again with
+`--ca-file` and the new path. A PEM file starts with
+`-----BEGIN CERTIFICATE-----`. A binary `.cer` or `.der` file has to be
+converted first, as the second line of the error shows.
 
 **"The TLS certificate of mail.example.com is for a different host name."**
 

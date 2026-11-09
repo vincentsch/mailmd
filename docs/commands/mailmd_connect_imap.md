@@ -20,6 +20,7 @@ mailmd connect imap --account work
 ## Flags
 
 - `--account` Name for this account, also used as its archive folder (default: from the provider or address)
+- `--ca-file` PEM file with the certificate of your server's own certificate authority. mailmd trusts it in addition to the system's certificates and saves it with the account
 - `--email` Your email address. mailmd fills in the server settings of known providers
 - `--exclude` Leave out this folder and its subfolders (repeat for more)
 - `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*' (repeat for more)

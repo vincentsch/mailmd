@@ -44,6 +44,7 @@ type Server struct {
 	listener net.Listener
 	addr     string
 	caPool   *x509.CertPool
+	caPEM    []byte
 	opts     Options
 
 	username string
@@ -76,7 +77,7 @@ func Start(t *testing.T, opts Options) *Server {
 	if opts.TLS == "" {
 		opts.TLS = TLSImplicit
 	}
-	cert, caPool, err := newTestCert()
+	cert, caPool, caPEM, err := newTestCert()
 	if err != nil {
 		t.Fatalf("new test certificate: %v", err)
 	}
@@ -88,6 +89,7 @@ func Start(t *testing.T, opts Options) *Server {
 		listener:     l,
 		addr:         l.Addr().String(),
 		caPool:       caPool,
+		caPEM:        caPEM,
 		opts:         opts,
 		username:     "mailmd-user",
 		password:     "mailmd-password",
@@ -170,6 +172,10 @@ func (s *Server) Port() int {
 func (s *Server) CertPool() *x509.CertPool { return s.caPool.Clone() }
 func (s *Server) Username() string         { return s.username }
 func (s *Server) Password() string         { return s.password }
+
+// CertPEM returns the server's self-signed certificate as PEM, for a CA
+// file.
+func (s *Server) CertPEM() []byte { return append([]byte(nil), s.caPEM...) }
 
 func (s *Server) UnblockList()  { s.unblockListOnce.Do(func() { close(s.unblockList) }) }
 func (s *Server) UnblockFetch() { s.unblockFetchOnce.Do(func() { close(s.unblockFetch) }) }

@@ -129,6 +129,7 @@ var specs = []spec{
 			"Give your email address, and mailmd fills in the server settings of known providers. " +
 			"In a terminal, it asks for anything that is missing, and then for the password in a hidden prompt.\n\n" +
 			"Scripts can pipe the password in with --password-stdin, or set MAILMD_IMAP_PASSWORD.\n\n" +
+			"If your server's certificate comes from your own certificate authority, give the authority's certificate with --ca-file. mailmd saves the file with the account and uses it for every sync.\n\n" +
 			"To enter a new password for a connected account, the account name is enough, like mailmd connect imap --account work.\n\n" +
 			"Use --dry-run to test the login without saving anything.",
 		examples: []string{

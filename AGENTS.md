@@ -70,6 +70,11 @@ For IMAP, [docs/imap.md](docs/imap.md) lists which providers need an app
 password and where the user creates it. Tell the user before they run the
 command, so they have the app password ready.
 
+If the user's server uses its own certificate authority, like many company
+mail servers, add `--ca-file <file>` with the authority's certificate as a
+PEM file. mailmd saves it with the account, so later syncs need no
+environment variable like `SSL_CERT_FILE`.
+
 If the user wants the mail somewhere other than `~/mail`, add `--out <folder>`.
 To leave out folders or older mail, add `--exclude <folder>` or
 `--since <age>`, like `--since 2y`. mailmd saves these settings.

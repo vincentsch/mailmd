@@ -91,8 +91,9 @@ sync`.
 
 Proton Mail offers IMAP only through Proton Mail Bridge, which runs on your
 computer. mailmd has not been tested with it. Bridge uses a certificate that
-it makes itself. mailmd accepts it only after you add it to the certificates
-your system trusts.
+it makes itself. mailmd accepts it when you give that certificate to
+`mailmd connect imap` with `--ca-file`, or when you add it to the
+certificates your system trusts.
 
 ## Does it work on Windows?
 

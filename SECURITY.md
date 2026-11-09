@@ -63,9 +63,11 @@ mailmd doesn't use the system keychain yet. If that matters to you:
 ## What mailmd sends over the network
 
 mailmd connects to your mail provider over TLS and checks the server's
-certificate. It has no option to turn that check off. The only other
-connection is `mailmd update --check`, which asks GitHub for the newest
-release. There is no telemetry.
+certificate. It has no option to turn that check off. For a server with its
+own certificate authority, `mailmd connect imap --ca-file` adds that
+authority's certificate for this one account. The only other connection is
+`mailmd update --check`, which asks GitHub for the newest release. There is
+no telemetry.
 
 ## What mailmd does with your mailbox
 
