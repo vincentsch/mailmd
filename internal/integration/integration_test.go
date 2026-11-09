@@ -577,3 +577,32 @@ func TestDryRunOfALeftOutFolderCountsItsMail(t *testing.T) {
 		})
 	}
 }
+
+// Adding Junk to a connected account needs no password, also in a dry run.
+// The default folders stay, and the first sync says that the server sent
+// no read marks, because the seeded mail has none.
+func TestIncludeJunkWithTheSavedPassword(t *testing.T) {
+	for _, s := range servers(t) {
+		t.Run(s.name, func(t *testing.T) {
+			u := user(t)
+			msgs := demo.Messages()[:3]
+			msgs[0].Folder, msgs[1].Folder, msgs[2].Folder = "INBOX", "Sent", "Junk"
+			seed(t, s, u, msgs)
+			r := newRun(t, s)
+			r.connect(s, u)
+			for _, args := range [][]string{{"--dry-run"}, nil} {
+				code, stdout, stderr := r.mailmd("", append([]string{"connect", "imap", "--account", "work", "--include", "Junk", "--no-prompt"}, args...)...)
+				if code != 0 || !strings.Contains(stdout, "saved password") {
+					t.Fatalf("connect --include Junk %v: %d %s %s", args, code, stdout, stderr)
+				}
+			}
+			result := r.sync().Accounts[0]
+			if result.New != 3 || !result.NoReadMarks {
+				t.Fatalf("sync: %+v", result)
+			}
+			if _, err := os.Stat(filepath.Join(r.out, "work", "Junk")); err != nil {
+				t.Fatalf("Junk was not copied: %v", err)
+			}
+		})
+	}
+}
