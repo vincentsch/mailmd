@@ -61,7 +61,7 @@ func TestSyncAllAccountsIntoTheDefaultRoot(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("sync %d %s %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"one: mailmd checked 1 folder and saved 3 new messages to ~/mail/one in", "two: mailmd checked 1 folder and saved 3 new messages"} {
+	for _, want := range []string{"one: mailmd checked INBOX and saved 3 new messages to ~/mail/one in", "two: mailmd checked INBOX and saved 3 new messages"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
 		}
@@ -73,14 +73,14 @@ func TestSyncAllAccountsIntoTheDefaultRoot(t *testing.T) {
 		}
 	}
 	code, stdout, _ = invoke(t, opts, "", "sync", "one")
-	if code != 0 || !strings.Contains(stdout, "one is up to date. mailmd checked 1 folder") {
+	if code != 0 || !strings.Contains(stdout, "one is up to date. mailmd checked INBOX in") {
 		t.Fatalf("second sync %d %s", code, stdout)
 	}
 	if code, stdout, _ = invoke(t, opts, "", "sync", "--quiet"); code != 0 || stdout != "" {
 		t.Fatalf("a quiet sync with nothing to report printed %q", stdout)
 	}
 	_, stdout, _ = invoke(t, opts, "", "status")
-	for _, want := range []string{"one (mock)", "Archive    ~/mail/one", "Messages   3 in 1 folder", "Last sync  just now, completed, checked 1 folder"} {
+	for _, want := range []string{"one (mock)", "Archive    ~/mail/one", "Messages   3 in 1 folder", "Last sync  just now, completed, checked INBOX"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("status is missing %q:\n%s", want, stdout)
 		}

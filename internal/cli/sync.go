@@ -257,7 +257,7 @@ func renderSync(w io.Writer, out SyncOutput, home string, several, quiet bool) {
 	}
 }
 
-// checkedFolders returns the folders a sync copied new mail from.
+// checkedFolders returns the folders that a sync checked for new mail.
 func checkedFolders(r mdsync.Result) []string {
 	out := []string{}
 	for _, f := range r.Folders {
@@ -272,18 +272,25 @@ func checkedFolders(r mdsync.Result) []string {
 // names them when --folder chose them, like "Junk", so a sync of a few
 // folders says which ones.
 func checkedText(r mdsync.Result) string {
-	checked := checkedFolders(r)
+	named := false
+	for _, f := range r.Folders {
+		named = named || f.Reason == mdsync.ReasonNotNamed
+	}
+	return folderWords(checkedFolders(r), named)
+}
+
+// folderWords names one folder, or several when named is set, and counts
+// them otherwise.
+func folderWords(paths []string, named bool) string {
+	switch {
 	// Gmail syncs all its labels as one scope, so a folder count would
 	// always say 1 while the files land in Inbox, Sent and the rest.
-	if len(checked) == 1 && checked[0] == mdsync.AllMailPath {
+	case len(paths) == 1 && paths[0] == mdsync.AllMailPath:
 		return "all mail"
+	case len(paths) == 1 || named && len(paths) > 0:
+		return joinNames(paths)
 	}
-	for _, f := range r.Folders {
-		if f.Reason == mdsync.ReasonNotNamed && len(checked) > 0 {
-			return joinNames(checked)
-		}
-	}
-	return plural(len(checked), "folder", "folders")
+	return plural(len(paths), "folder", "folders")
 }
 
 func renderSyncResult(w io.Writer, r mdsync.Result, home string, several bool) {

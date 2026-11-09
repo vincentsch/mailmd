@@ -116,12 +116,8 @@ func renderStatus(w io.Writer, out StatusOutput, home string, now time.Time, det
 			last := ago(s.LastSync.Finished, now) + ", " + outcomeText(s.LastSync.Outcome)
 			// The archive counts the folders that have mail. The sync
 			// checked others too, like an empty Drafts.
-			if n := len(s.LastSync.Checked); n > 0 {
-				if n == 1 && s.LastSync.Checked[0] == mdsync.AllMailPath {
-					last += ", checked all mail"
-				} else {
-					last += ", checked " + plural(n, "folder", "folders")
-				}
+			if len(s.LastSync.Checked) > 0 {
+				last += ", checked " + folderWords(s.LastSync.Checked, false)
 			}
 			if s.LastSync.New > 0 {
 				last += ", " + count(s.LastSync.New) + " new"

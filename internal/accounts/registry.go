@@ -373,7 +373,7 @@ type LastSync struct {
 	Finished time.Time `json:"finished"`
 	Outcome  string    `json:"outcome"`
 	New      int       `json:"new"`
-	// Checked names the folders the sync copied new mail from.
+	// Checked names the folders that the sync checked for new mail.
 	Checked []string `json:"checked"`
 	Error   string   `json:"error,omitempty"`
 }
