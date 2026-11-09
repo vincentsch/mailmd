@@ -520,6 +520,11 @@ func TestIndexEntryHasTheRecipientsAndSurvivesARebuild(t *testing.T) {
 	msg := plainMessage(time.UTC)
 	msg.Folders = []string{"INBOX"}
 	msg.To = []mail.Address{{Name: "Dana Reyes", Email: "dana@example.com"}, {Email: "bob@example.com"}}
+	msg.Attachments = []mail.Attachment{
+		{Filename: "INV-1043.pdf", MIMEType: "application/pdf", Data: []byte("%PDF")},
+		{Filename: `Plan "final", v2.pdf`, MIMEType: "application/pdf", Data: []byte("%PDF")},
+		{MIMEType: "application/pdf", Data: []byte("%PDF")},
+	}
 	result, err := WriteMessage(context.Background(), Options{Root: root, Account: "Acct"}, msg)
 	if err != nil {
 		t.Fatal(err)
@@ -527,6 +532,14 @@ func TestIndexEntryHasTheRecipientsAndSurvivesARebuild(t *testing.T) {
 	written := IndexEntries(msg, result)[0]
 	if !reflect.DeepEqual(written.To, []string{"Dana Reyes <dana@example.com>", "bob@example.com"}) {
 		t.Fatalf("to = %q", written.To)
+	}
+	// The index names the attachments, so a reader sees them without
+	// opening the file. The names are the ones in the frontmatter.
+	if want := []string{"INV-1043.pdf", `Plan "final", v2.pdf`, "attachment.pdf"}; !reflect.DeepEqual(written.Attachments, want) {
+		t.Fatalf("attachments = %q, want %q", written.Attachments, want)
+	}
+	if line, _ := json.Marshal(written); !strings.Contains(string(line), `"attachments":["INV-1043.pdf","Plan \"final\", v2.pdf","attachment.pdf"]`) {
+		t.Fatalf("index line: %s", line)
 	}
 	// A lost index is built again from the files, with the same lines.
 	read, ok := ReadIndexEntry(result.Files[0].Path, written.Path)

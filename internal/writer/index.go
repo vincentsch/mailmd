@@ -20,12 +20,14 @@ type IndexEntry struct {
 	To      []string `json:"to,omitempty"`
 	Subject string   `json:"subject,omitempty"`
 	// Folder is the provider's folder, like "INBOX" or "Work/Clients".
-	Folder      string   `json:"folder"`
-	Labels      []string `json:"labels,omitempty"`
-	Flags       []string `json:"flags,omitempty"`
-	Thread      string   `json:"thread,omitempty"`
-	MessageID   string   `json:"message_id,omitempty"`
-	Attachments int      `json:"attachments,omitempty"`
+	Folder    string   `json:"folder"`
+	Labels    []string `json:"labels,omitempty"`
+	Flags     []string `json:"flags,omitempty"`
+	Thread    string   `json:"thread,omitempty"`
+	MessageID string   `json:"message_id,omitempty"`
+	// Attachments lists the attachment names, like the frontmatter's
+	// attachments.
+	Attachments []string `json:"attachments,omitempty"`
 	// Omitted is the size of a message that was saved with its headers
 	// only, because it was larger than the size limit.
 	Omitted int64 `json:"omitted_bytes,omitempty"`
@@ -44,6 +46,10 @@ func IndexEntries(m mail.Message, result WriteResult) []IndexEntry {
 		date = d.Format(time.RFC3339)
 	}
 	prefix := result.AccountDir + "/"
+	var names []string
+	for _, a := range m.Attachments {
+		names = append(names, attachmentLabel(a))
+	}
 	var out []IndexEntry
 	for _, f := range result.Files {
 		rel := strings.TrimPrefix(f.RelPath, prefix)
@@ -61,7 +67,7 @@ func IndexEntries(m mail.Message, result WriteResult) []IndexEntry {
 			Flags:       FlagNames(m.Flags),
 			Thread:      m.ThreadID,
 			MessageID:   m.MessageID,
-			Attachments: len(m.Attachments),
+			Attachments: names,
 			Omitted:     m.OmittedSize,
 			Ref:         m.Ref,
 			Path:        rel,
@@ -123,8 +129,7 @@ func readFrontmatter(file, rel string) (IndexEntry, string, bool) {
 		raw := []byte(value)
 		switch key {
 		case "attachments":
-			names, _ := parseFlowList(raw)
-			entry.Attachments = len(names)
+			entry.Attachments, _ = parseFlowList(raw)
 			continue
 		case "flags":
 			entry.Flags, _ = parseFlowList(raw)

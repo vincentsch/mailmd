@@ -20,7 +20,7 @@ First release of mailmd.
 - Save messages larger than the size limit with their headers and a note, and replace them with the full message when a later sync has a higher limit.
 - Save a message that can't be read with the headers that can be read and the reason. The original message goes into an `.eml` file next to it.
 - When a message is deleted on the server, leave its file in place and mark it with `deleted_on_server`. The sync reports the deletions.
-- Write `index.jsonl` with one line per message for scripts and agents, with the sender and the recipients, and rebuild it from the Markdown files when it is lost or damaged.
+- Write `index.jsonl` with one line per message for scripts and agents. Each line has the sender and the recipients, and it names the attachments. Rebuild the file from the Markdown files when it is lost or damaged.
 - Convert HTML mail to Markdown with its links and data tables, and drop hidden preview text. `--prefer-text` uses the plain text part instead.
 - When an invite has no text, write the details of its event and its agenda into the file.
 - Escape plain text, so a Markdown viewer never loads images or HTML from it.

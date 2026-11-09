@@ -56,9 +56,9 @@ func (r *run) addToIndex(entries []writer.IndexEntry, batch *writer.Batch) error
 }
 
 func sameEntry(a, b writer.IndexEntry) bool {
-	return a.Date == b.Date && a.From == b.From && a.Subject == b.Subject && a.Folder == b.Folder &&
+	return a.Date == b.Date && a.From == b.From && slices.Equal(a.To, b.To) && a.Subject == b.Subject && a.Folder == b.Folder &&
 		slices.Equal(a.Labels, b.Labels) && slices.Equal(a.Flags, b.Flags) && a.Thread == b.Thread &&
-		a.MessageID == b.MessageID && a.Attachments == b.Attachments && a.Omitted == b.Omitted && a.Ref == b.Ref && a.Gone == b.Gone
+		a.MessageID == b.MessageID && slices.Equal(a.Attachments, b.Attachments) && a.Omitted == b.Omitted && a.Ref == b.Ref && a.Gone == b.Gone
 }
 
 // finishIndex sorts the index and drops repeated lines after new entries

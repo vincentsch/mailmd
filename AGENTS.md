@@ -204,7 +204,8 @@ if the user agrees:
 - Start with `index.jsonl` in the account folder. It has one JSON line per
   message, newest first. Each line has the sender (`from`) and the
   recipients (`to`) of a message. It also has the subject and the path of
-  the file. Filter it with `jq` or `rg`, then open only the files you need.
+  the file, and `attachments` lists the names of the attachments. Filter it
+  with `jq` or `rg`, then open only the files you need.
 - Search message files with `rg -il`. The frontmatter has one `from:`, `to:`
   and `subject:` line per file.
 - Messages with the same `thread_id` belong to one conversation. Read the
