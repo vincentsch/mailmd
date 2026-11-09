@@ -97,6 +97,47 @@ mailmd connect imap --email you@example.com --out ~/Documents/mail
 mailmd saves the folder for that account. For a single sync into another
 folder, use `mailmd sync --out <folder>`.
 
+## Moving the archive
+
+mailmd doesn't move any files when you change `--out` later. You move the
+account's folder yourself, then tell mailmd the new place. Say your archive
+is in `~/mail/work`, and you want it in `~/Documents/mail/work`:
+
+1. Make sure no sync runs. If you sync on a schedule, pause the job.
+2. Move the account's folder. A normal move takes the hidden `.mailmd`
+   folder with it, which holds the position of the last sync:
+
+   ```sh
+   mkdir -p ~/Documents/mail
+   mv ~/mail/work ~/Documents/mail/
+   ```
+
+   On Windows, move the folder in Explorer, or with `Move-Item` in
+   PowerShell.
+3. Save the new place. `--out` is the folder that holds the account
+   folders, so mailmd adds `work` itself:
+
+   ```sh
+   mailmd connect imap --account work --out ~/Documents/mail
+   ```
+
+   mailmd keeps the saved password and your other settings. For Gmail and
+   Outlook, use `mailmd connect gmail` or `mailmd connect outlook` with the
+   account name. They keep the saved login and don't sign in again.
+4. Run `mailmd sync work`. It says that `work` is up to date, or it fetches
+   only the mail that is new since the last sync.
+
+If you change `--out` first, mailmd says that the archived mail stays in the
+old folder, and you move it before the next sync. A sync that runs before
+the move starts a new archive in the new place and downloads the mail
+again. Nothing is lost then, but you have two copies.
+
+The config folder isn't part of the archive, so it stays where it is. The
+same goes for a CA file that you gave with `--ca-file`. If you move that
+file, connect again with `--ca-file` and the new path. Also change the path
+in your scheduled job and in your agent instructions, if they name the
+folder.
+
 ## Sync
 
 ```sh

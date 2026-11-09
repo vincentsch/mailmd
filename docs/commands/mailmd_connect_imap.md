@@ -29,7 +29,7 @@ mailmd connect imap --account work
 - `--host` IMAP server, like imap.example.com
 - `--include` Also sync this folder, like Junk, and keep the default folders. mailmd saves it with the account (repeat for more)
 - `--keep-raw` Also save each original message as an .eml file next to its Markdown file
-- `--out` Folder for the archive (default: ~/mail)
+- `--out` Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived
 - `--password-stdin` Read the password from the first line of standard input
 - `--port` IMAP port (default: 993, or 143 with --tls starttls)
 - `--prefer-text` Use the plain text part of a message instead of converting its HTML part

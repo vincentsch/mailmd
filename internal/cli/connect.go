@@ -40,7 +40,10 @@ type ConnectResult struct {
 	LeftOut []string `json:"left_out"`
 	// CAFile is the saved PEM file with more certificates to trust.
 	CAFile string `json:"ca_file,omitempty"`
-	Next   string `json:"next"`
+	// OldArchive is the archive folder that the account used before a new
+	// --out. It still has files, and mailmd doesn't move them.
+	OldArchive string `json:"old_archive,omitempty"`
+	Next       string `json:"next"`
 	// Note is a provider-specific remark, such as Gmail's All Mail folder.
 	Note string `json:"note,omitempty"`
 }
@@ -56,7 +59,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("tls", "implicit", "How to encrypt the connection: implicit or starttls")
 		c.Flags().String("ca-file", "", "PEM file with the certificate of your server's own certificate authority. mailmd trusts it in addition to the system's certificates and saves it with the account")
 		c.Flags().Bool("password-stdin", false, "Read the password from the first line of standard input")
-		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
+		c.Flags().String("out", "", "Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived")
 		addFilterFlags(c, true)
 	}
 	imapCmd.Run = m.connectIMAP
@@ -66,7 +69,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("client-secret", "", "The OAuth client JSON file you downloaded from Google Cloud (not needed to connect an account again)")
 		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: gmail)")
 		c.Flags().Bool("no-browser", false, "Don't open a browser, only print the sign-in address")
-		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
+		c.Flags().String("out", "", "Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived")
 		addFilterFlags(c, true)
 	}
 	gmailCmd.Run = m.connectGmail
@@ -76,7 +79,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("client-id", "", "The application (client) ID of your Microsoft app registration (not needed to connect an account again)")
 		c.Flags().String("tenant", "common", "Who can sign in: common, organizations, consumers, or your tenant ID")
 		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: outlook)")
-		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
+		c.Flags().String("out", "", "Folder for the archive (default: ~/mail). A new folder doesn't move the mail that is already archived")
 		addFilterFlags(c, true)
 	}
 	outlookCmd.Run = m.connectOutlook
@@ -227,6 +230,10 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 	// changes settings, like the folders or --out. A new password, or
 	// another server or login name, needs the password.
 	old, saved := savedAccount(opts.root, s.account, "imap")
+	previous := ""
+	if saved {
+		previous = m.archiveOf(old)
+	}
 	problem := ""
 	if saved && !m.passwordGiven(c) && strings.EqualFold(old.Settings.Host, s.host) && old.Settings.Username == s.username && changesSettings(c, "ca-file", "tls", "port") {
 		next := old
@@ -291,13 +298,13 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 		if err := checkFolders(opts, account, folders); err != nil {
 			return err
 		}
-		return m.writeConnect(f, c, account, folders, connectReport{dry: true})
+		return m.writeConnect(f, c, account, folders, connectReport{dry: true, previous: previous})
 	}
 	account, err := accounts.Connect(c.Context(), opts.root, s.account, "imap", probe, m.opts.ConnectHooks)
 	if err != nil {
 		return connectError(err, "imap")
 	}
-	return m.finishConnect(f, c, account, opts, folders)
+	return m.finishConnect(f, c, account, opts, folders, previous)
 }
 
 // passwordGiven reports whether connect imap got a password on stdin or in
@@ -388,7 +395,7 @@ func (m module) changeSettings(f *rg.Factory, c *cobra.Command, old, next accoun
 			return true, newUserError(rg.ExitAPI, "The new settings of "+old.Name+" could not be saved", "Run the same connect command again.")
 		}
 	}
-	return true, m.writeConnect(f, c, next, folders, connectReport{dry: f.DryRun(), keptLogin: true})
+	return true, m.writeConnect(f, c, next, folders, connectReport{dry: f.DryRun(), keptLogin: true, previous: m.archiveOf(old)})
 }
 
 // loginFailed reports whether the saved login of an account can't be used,
@@ -658,8 +665,10 @@ func checkFolders(opts connectOptions, a accounts.AccountConfig, folders []backe
 	return &userError{code: rg.ExitUsage, info: mdsync.Describe(err, a)}
 }
 
-// finishConnect saves the archive folder and filters, then prints the result.
-func (m module) finishConnect(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, folders []backend.Folder) error {
+// finishConnect saves the archive folder and filters, then prints the
+// result. previous is the archive folder of the account before this
+// command, or "" for a new account.
+func (m module) finishConnect(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, folders []backend.Folder, previous string) error {
 	if err := checkFolders(opts, a, folders); err != nil {
 		var u *userError
 		errors.As(err, &u)
@@ -676,7 +685,7 @@ func (m module) finishConnect(f *rg.Factory, c *cobra.Command, a accounts.Accoun
 		}
 		a = updated
 	}
-	return m.writeConnect(f, c, a, folders, connectReport{})
+	return m.writeConnect(f, c, a, folders, connectReport{previous: previous})
 }
 
 // archiveOf returns the archive folder of an account.
@@ -688,12 +697,48 @@ func (m module) archiveOf(a accounts.AccountConfig) string {
 	return filepath.Join(root, a.ArchiveDir)
 }
 
+// previousArchive returns the archive folder of a connected account, or ""
+// when there is no such account yet.
+func (m module) previousArchive(root, name, kind string) string {
+	if old, ok := savedAccount(root, name, kind); ok {
+		return m.archiveOf(old)
+	}
+	return ""
+}
+
+// oldArchive returns the folder that an account no longer uses after a new
+// --out, when files are still in it.
+func oldArchive(previous, archive string) string {
+	if previous == "" || filepath.Clean(previous) == filepath.Clean(archive) || !hasFiles(previous) {
+		return ""
+	}
+	return previous
+}
+
+func hasFiles(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	return err == nil && len(entries) > 0
+}
+
+// movedArchiveNote tells that the files stay in the old archive folder, and
+// how to move them.
+func movedArchiveNote(old, archive, home string) string {
+	if hasFiles(archive) {
+		return fmt.Sprintf("%s still has the mail that was archived there. mailmd no longer uses that folder and leaves it as it is.", shortPath(old, home))
+	}
+	return fmt.Sprintf("mailmd doesn't move the mail that is already archived in %s. Move that folder into %s before the next sync. "+
+		"Otherwise the next sync starts a new archive in %s and downloads the mail again.", shortPath(old, home), shortPath(filepath.Dir(archive), home), shortPath(archive, home))
+}
+
 // connectReport says how a connect went, for its output.
 type connectReport struct {
 	dry bool
 	// keptLogin is set when only settings changed, and the saved login
 	// stayed.
 	keptLogin bool
+	// previous is the archive folder before this command, or "" for a new
+	// account.
+	previous string
 }
 
 // writeConnect prints the result of a connect. a has the settings that a
@@ -705,6 +750,7 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 		Address: a.Email, Archive: m.archiveOf(a), DryRun: dry, LeftOut: []string{},
 		CAFile: a.Settings.CAFile, Next: "mailmd sync " + a.Name,
 	}
+	result.OldArchive = oldArchive(report.previous, result.Archive)
 	filter := savedFilter(a).ForFolders(folders)
 	for _, folder := range folders {
 		if !folder.Fetchable {
@@ -758,6 +804,9 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 			fmt.Fprintf(w, "mailmd trusts the certificate authority in %s for this account, in addition to the system's certificates.\n", shortPath(result.CAFile, home))
 		}
 		fmt.Fprintf(w, "Mail goes to %s.\n", shortPath(result.Archive, home))
+		if result.OldArchive != "" {
+			fmt.Fprintln(w, movedArchiveNote(result.OldArchive, result.Archive, home))
+		}
 		if !dry {
 			fmt.Fprintf(w, "\nNext: %s\n", result.Next)
 		}

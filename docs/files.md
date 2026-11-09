@@ -318,6 +318,9 @@ the server's numbers. Only their `ref` changes to the new numbers.
 `.mailmd/lock` stops a second sync from working on the same archive at the
 same time. Don't edit these files.
 
+When you move the archive to another folder, move the `.mailmd` folder with
+it. [Moving the archive](quickstart.md#moving-the-archive) shows the steps.
+
 If you delete the `.mailmd` folder, the next sync reads all folders again and
 finds that the messages are already there. There is one exception. A message
 that was first saved with its headers only and later fetched in full gets a

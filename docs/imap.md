@@ -161,7 +161,8 @@ mailmd connect imap --account work --exclude Newsletters
 mailmd keeps the saved password and doesn't ask for it, also with
 `--dry-run`. It logs in with the saved password to check the new settings,
 then saves them. Settings you don't give stay as they are, and so do your
-archive and its sync state.
+archive and its sync state. If you change `--out`, read [Moving the
+archive](quickstart.md#moving-the-archive) first.
 
 mailmd needs the password again only when you give another `--host` or
 `--username`, because that is a new login. It checks the new login before it

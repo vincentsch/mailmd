@@ -130,6 +130,11 @@ mailmd keeps the saved password or login and asks for nothing, so you can
 run it yourself. Run it with `--dry-run` first and show the user what it
 says. Only another `--host` or `--username` needs the password again.
 
+A new `--out` doesn't move the files that are already archived. If the user
+wants the archive somewhere else, follow
+[Moving the archive](docs/quickstart.md#moving-the-archive), and ask before
+you move their files.
+
 When the user wants to remove an account, run
 `mailmd disconnect <account> --dry-run` and show the user which files it
 would delete. Run it without `--dry-run` only when the user agrees. It

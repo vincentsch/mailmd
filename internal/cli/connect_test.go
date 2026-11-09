@@ -401,3 +401,53 @@ func TestChangingSettingsKeepsTheSavedPassword(t *testing.T) {
 		t.Fatalf("after the new password = %+v", r.Accounts[0])
 	}
 }
+
+// A new --out leaves the archived mail where it is. connect says so and
+// how to move it. After the move, the next sync goes on where it stopped.
+func TestANewOutSaysWhereTheArchivedMailIs(t *testing.T) {
+	server := imaptest.Start(t, imaptest.Options{})
+	root, home := t.TempDir(), t.TempDir()
+	opts := Options{ConfigRoot: root, HomeDir: home, RootCAs: server.CertPool()}
+	if code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin", "--folder", "INBOX")...); code != 0 {
+		t.Fatalf("connect %d %s %s", code, stdout, stderr)
+	}
+	if code, stdout, stderr := invoke(t, opts, "", "sync", "work"); code != 0 {
+		t.Fatalf("sync %d %s %s", code, stdout, stderr)
+	}
+	old, moved := filepath.Join(home, "mail", "work"), filepath.Join(home, "Documents", "mail", "work")
+	note := "mailmd doesn't move the mail that is already archived in ~/mail/work. Move that folder into ~/Documents/mail before the next sync."
+	_, stdout, _ := invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/Documents/mail", "--dry-run")
+	if !strings.Contains(stdout, note) {
+		t.Fatalf("dry run:\n%s", stdout)
+	}
+	_, stdout, _ = invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/Documents/mail", "--json")
+	var result ConnectResult
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil || result.OldArchive != old || result.Archive != moved {
+		t.Fatalf("json %v:\n%s", err, stdout)
+	}
+	// The move that the note asks for, with the hidden .mailmd folder.
+	if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(old, moved); err != nil {
+		t.Fatal(err)
+	}
+	if _, stdout, _ = invoke(t, opts, "", "sync", "work"); !strings.Contains(stdout, "work is up to date.") {
+		t.Fatalf("sync after the move:\n%s", stdout)
+	}
+	if _, stdout, _ = invoke(t, opts, "", "connect", "imap", "--account", "work", "--since", "2y"); strings.Contains(stdout, "doesn't move") {
+		t.Fatalf("a connect without a new --out talks about moving:\n%s", stdout)
+	}
+	// When both folders have files, connect says that the old one stays.
+	if err := os.MkdirAll(old, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(old, "notes.txt"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/mail")
+	_, stdout, _ = invoke(t, opts, "", "connect", "imap", "--account", "work", "--out", "~/Documents/mail")
+	if !strings.Contains(stdout, "~/mail/work still has the mail that was archived there. mailmd no longer uses that folder and leaves it as it is.") {
+		t.Fatalf("both folders have files:\n%s", stdout)
+	}
+}

@@ -33,6 +33,7 @@ func (m module) connectGmail(f *rg.Factory, c *cobra.Command, args []string) err
 		return err
 	}
 	secret := strings.TrimSpace(flagString(c, "client-secret"))
+	previous := m.previousArchive(opts.root, name, "gmail")
 	// Changing only settings keeps the saved login, so there is no sign-in.
 	if old, ok := savedAccount(opts.root, name, "gmail"); ok && secret == "" && changesSettings(c) {
 		done, err := m.changeSettings(f, c, old, old, opts)
@@ -68,7 +69,7 @@ func (m module) connectGmail(f *rg.Factory, c *cobra.Command, args []string) err
 		if savedClientOf != "" {
 			text = "mailmd can use the OAuth client saved for " + name + "."
 		}
-		return m.writeOAuthDryRun(f, c, planned, opts, text+" Nothing was saved because of --dry-run. Without --dry-run, mailmd shows the Google sign-in address.")
+		return m.writeOAuthDryRun(f, c, planned, opts, previous, text+" Nothing was saved because of --dry-run. Without --dry-run, mailmd shows the Google sign-in address.")
 	}
 	interactive := m.interactive(f)
 	// A person at a terminal can paste the address or press Ctrl-C. A
@@ -151,16 +152,23 @@ func (m module) connectGmail(f *rg.Factory, c *cobra.Command, args []string) err
 		return connectError(err, "gmail")
 	}
 	f.Infof("If your Google Cloud app is in testing mode, Google ends this login after 7 days. The Gmail guide shows how to avoid that: https://github.com/vincentsch/mailmd/blob/main/docs/gmail.md#the-7-day-limit-in-testing-mode")
-	return m.finishConnect(f, c, account, opts, folders)
+	return m.finishConnect(f, c, account, opts, folders, previous)
 }
 
 // writeOAuthDryRun prints the result of an OAuth connect with --dry-run.
 // The settings were checked, and nothing else happened.
-func (m module) writeOAuthDryRun(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, text string) error {
+func (m module) writeOAuthDryRun(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, previous, text string) error {
 	applySettings(c, opts, &a)
 	result := ConnectResult{Schema: "mailmd-connect/1", Account: a.Name, Backend: a.Backend, Provider: providerName(a.Backend),
 		Archive: m.archiveOf(a), DryRun: true, LeftOut: []string{}, Next: "mailmd sync " + a.Name}
-	render := func(w io.Writer) { fmt.Fprintln(w, text) }
+	result.OldArchive = oldArchive(previous, result.Archive)
+	home := m.home()
+	render := func(w io.Writer) {
+		fmt.Fprintln(w, text)
+		if result.OldArchive != "" {
+			fmt.Fprintln(w, movedArchiveNote(result.OldArchive, result.Archive, home))
+		}
+	}
 	return f.WriteOutput(rg.Output{Model: result, Human: render, Plain: render, Meta: output.Meta{Extra: map[string]any{"command": c.CommandPath()}}})
 }
 
@@ -179,6 +187,7 @@ func (m module) connectOutlook(f *rg.Factory, c *cobra.Command, args []string) e
 	}
 	clientID := strings.TrimSpace(flagString(c, "client-id"))
 	tenant := flagString(c, "tenant")
+	previous := m.previousArchive(opts.root, name, "graph")
 	// Changing only settings keeps the saved login, so there is no sign-in.
 	// A client ID or a tenant needs a new one.
 	if old, ok := savedAccount(opts.root, name, "graph"); ok && clientID == "" && !c.Flags().Changed("tenant") && changesSettings(c) {
@@ -204,7 +213,7 @@ func (m module) connectOutlook(f *rg.Factory, c *cobra.Command, args []string) e
 		return connectError(err, "graph")
 	}
 	if f.DryRun() {
-		return m.writeOAuthDryRun(f, c, planned, opts,
+		return m.writeOAuthDryRun(f, c, planned, opts, previous,
 			"The client ID and tenant look right. Nothing was saved because of --dry-run. Without --dry-run, mailmd shows a sign-in code.")
 	}
 	var folders []backend.Folder
@@ -243,7 +252,7 @@ func (m module) connectOutlook(f *rg.Factory, c *cobra.Command, args []string) e
 	if err != nil {
 		return connectError(err, "graph")
 	}
-	return m.finishConnect(f, c, account, opts, folders)
+	return m.finishConnect(f, c, account, opts, folders, previous)
 }
 
 // savedAccount returns the connected account of that name, if it uses the
