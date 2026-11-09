@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/vincentsch/mailmd/internal/mail"
@@ -52,7 +53,10 @@ func TestPlanningSessionMatchesSequentialApplyWithoutDiskMutation(t *testing.T) 
 			t.Fatalf("position %d: apply %#v, plan %#v", i, actual, plans[i])
 		}
 	}
-	if !plans[0].Changed || plans[1].Changed || !plans[2].Changed || plans[3].Changed || !plans[4].Changed || plans[5].Changed {
+	// Windows has no Unix modes, so the first write has nothing to repair
+	// there.
+	repair := runtime.GOOS != "windows"
+	if plans[0].Changed != repair || plans[1].Changed || !plans[2].Changed || plans[3].Changed || !plans[4].Changed || plans[5].Changed {
 		t.Fatal("sequence did not exercise repairs, updates and removals")
 	}
 }
