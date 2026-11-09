@@ -20,7 +20,8 @@ The agent installs mailmd and runs the first sync. When mailmd needs your
 password, the agent asks you to type it into your own terminal, so the agent
 never sees it.
 
-If you already have an archive, start the agent in it:
+If you already have an archive, start the agent in it. It is in `~/mail`,
+or in the folder you gave to `--out`:
 
 ```sh
 cd ~/mail
@@ -71,6 +72,11 @@ sync](scheduling.md). The agent can also run `mailmd sync` itself. When a
 message seems to be missing, `mailmd list folders` shows the folders on the
 server and which of them a sync leaves out, like Junk.
 
+A message file lists its `flags`, like `seen` and `answered`. Some servers
+keep no such marks. Then every message looks unread, and `mailmd status`
+says so in its `Flags` line. For a question like "which emails still need an
+answer", ask the agent to look for your replies in the Sent folder.
+
 To tell every new session where your mail is, add a few lines to the agent's
 instructions, like `CLAUDE.md` or `AGENTS.md` in your home folder:
 
@@ -78,6 +84,30 @@ instructions, like `CLAUDE.md` or `AGENTS.md` in your home folder:
 My email is in ~/mail as Markdown files, one folder per account, synced by
 mailmd. Each account has an index.jsonl with one line per message. Run
 `mailmd sync` to fetch new mail. Never delete or edit files in ~/mail.
+To tell whether I answered a message, look for my reply in the same thread,
+usually in the Sent folder. Don't go by the flags alone, because some
+servers keep no read or answered marks.
+```
+
+The note above is for the default folders. Change it if you set up mailmd
+in another way:
+
+- If you connected with `--out`, write that folder instead of `~/mail`.
+- If you keep mailmd's settings in a folder of your own with
+  `MAILMD_CONFIG_ROOT`, the sync command in the note needs that variable.
+  Without it, mailmd finds no account.
+
+With `--out ~/Documents/mail` and the settings in
+`/home/dana/work/mailmd-config`, the note becomes:
+
+```markdown
+My email is in ~/Documents/mail as Markdown files, one folder per account,
+synced by mailmd. Each account has an index.jsonl with one line per message.
+Run `MAILMD_CONFIG_ROOT=/home/dana/work/mailmd-config mailmd sync` to fetch
+new mail. Never delete or edit files in ~/Documents/mail. To tell whether I
+answered a message, look for my reply in the same thread, usually in the
+Sent folder. Don't go by the flags alone, because some servers keep no read
+or answered marks.
 ```
 
 ## Privacy

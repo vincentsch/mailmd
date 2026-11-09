@@ -193,7 +193,17 @@ if the user agrees:
   My email is in ~/mail as Markdown files, one folder per account, synced by
   mailmd. Each account has an index.jsonl with one line per message. Run
   `mailmd sync` to fetch new mail. Never delete or edit files in ~/mail.
+  To tell whether I answered a message, look for my reply in the same thread,
+  usually in the Sent folder. Don't go by the flags alone, because some
+  servers keep no read or answered marks.
   ```
+
+  Fit the note to the setup. If you used `--out`, write that folder instead
+  of `~/mail`. `mailmd list accounts` shows the archive folder of each
+  account, and the note names the folder that holds it. If you set
+  `MAILMD_CONFIG_ROOT`, put it in front of the sync command with the full
+  path, like `MAILMD_CONFIG_ROOT=/home/dana/work/mailmd-config mailmd sync`.
+  [docs/agents.md](docs/agents.md#tips) shows a note with both.
 
 - To sync every 15 minutes, using the example for their system in
   [docs/scheduling.md](docs/scheduling.md).
