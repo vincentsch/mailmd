@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/vincentsch/mailmd/internal/accounts"
 	"github.com/vincentsch/mailmd/internal/auth"
 	"github.com/vincentsch/mailmd/internal/backend"
+	mdsync "github.com/vincentsch/mailmd/internal/sync"
 	rg "github.com/vincentsch/rungrad"
 	"github.com/vincentsch/rungrad/output"
 )
@@ -33,6 +33,14 @@ func (m module) connectGmail(f *rg.Factory, c *cobra.Command, args []string) err
 		return err
 	}
 	secret := strings.TrimSpace(flagString(c, "client-secret"))
+	// Changing only settings keeps the saved login, so there is no sign-in.
+	if old, ok := savedAccount(opts.root, name, "gmail"); ok && secret == "" && changesSettings(c) {
+		done, err := m.changeSettings(f, c, old, old, opts)
+		if done {
+			return err
+		}
+		fmt.Fprintln(f.Stderr, mdsync.Describe(err, old).Message+" mailmd signs in again and then saves the new settings.")
+	}
 	// Connecting an account again uses the client saved with its login, so
 	// the downloaded file is needed only the first time.
 	savedClientOf := ""
@@ -149,12 +157,9 @@ func (m module) connectGmail(f *rg.Factory, c *cobra.Command, args []string) err
 // writeOAuthDryRun prints the result of an OAuth connect with --dry-run.
 // The settings were checked, and nothing else happened.
 func (m module) writeOAuthDryRun(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, text string) error {
-	root := opts.archive
-	if root == "" {
-		root, _ = m.defaultRoot()
-	}
+	applySettings(c, opts, &a)
 	result := ConnectResult{Schema: "mailmd-connect/1", Account: a.Name, Backend: a.Backend, Provider: providerName(a.Backend),
-		Archive: filepath.Join(root, a.ArchiveDir), DryRun: true, LeftOut: []string{}, Next: "mailmd sync " + a.Name}
+		Archive: m.archiveOf(a), DryRun: true, LeftOut: []string{}, Next: "mailmd sync " + a.Name}
 	render := func(w io.Writer) { fmt.Fprintln(w, text) }
 	return f.WriteOutput(rg.Output{Model: result, Human: render, Plain: render, Meta: output.Meta{Extra: map[string]any{"command": c.CommandPath()}}})
 }
@@ -174,6 +179,15 @@ func (m module) connectOutlook(f *rg.Factory, c *cobra.Command, args []string) e
 	}
 	clientID := strings.TrimSpace(flagString(c, "client-id"))
 	tenant := flagString(c, "tenant")
+	// Changing only settings keeps the saved login, so there is no sign-in.
+	// A client ID or a tenant needs a new one.
+	if old, ok := savedAccount(opts.root, name, "graph"); ok && clientID == "" && !c.Flags().Changed("tenant") && changesSettings(c) {
+		done, err := m.changeSettings(f, c, old, old, opts)
+		if done {
+			return err
+		}
+		fmt.Fprintln(f.Stderr, mdsync.Describe(err, old).Message+" mailmd signs in again and then saves the new settings.")
+	}
 	// Connecting an account again uses its saved client ID, and its saved
 	// tenant unless --tenant is given. A new client ID starts from --tenant.
 	if old, ok := savedAccount(opts.root, name, "graph"); ok && clientID == "" {

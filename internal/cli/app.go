@@ -130,12 +130,15 @@ var specs = []spec{
 			"In a terminal, it asks for anything that is missing, and then for the password in a hidden prompt.\n\n" +
 			"Scripts can pipe the password in with --password-stdin, or set MAILMD_IMAP_PASSWORD.\n\n" +
 			"If your server's certificate comes from your own certificate authority, give the authority's certificate with --ca-file. mailmd saves the file with the account and uses it for every sync.\n\n" +
-			"To enter a new password for a connected account, the account name is enough, like mailmd connect imap --account work.\n\n" +
+			"To change a setting of a connected account, give the account name and the new setting, like mailmd connect imap --account work --out ~/Documents/mail. " +
+			"mailmd keeps the saved password, also with --dry-run. It needs the password again only when you change the server or the login name. " +
+			"To enter a new password, give only the account name, like mailmd connect imap --account work.\n\n" +
 			"Use --dry-run to test the login without saving anything.",
 		examples: []string{
 			"mailmd connect imap --email you@fastmail.com",
 			"mailmd connect imap --account work --host imap.example.com --username you@example.com",
 			"printf '%s\\n' \"$PASSWORD\" | mailmd connect imap --email you@example.com --host imap.example.com --password-stdin",
+			"mailmd connect imap --account work --out ~/Documents/mail",
 			"mailmd connect imap --account work",
 		},
 		related: []string{"sync", "list accounts"},
@@ -150,7 +153,8 @@ var specs = []spec{
 			"The Gmail guide shows how to create one: https://github.com/vincentsch/mailmd/blob/main/docs/gmail.md\n\n" +
 			"mailmd prints the Google sign-in address, and in a terminal it also opens the address in your browser. " +
 			"On a computer without a browser, use --no-browser. After you sign in on another device, paste the address that the browser ends up on.\n\n" +
-			"To connect an account again, for example after its login ended, the account name is enough. mailmd then uses the client it saved, and a new --client-secret replaces it.",
+			"To connect an account again, for example after its login ended, the account name is enough. mailmd then uses the client it saved, and a new --client-secret replaces it.\n\n" +
+			"To change a setting of a connected account, like --out or --folder, give the account name and the new setting. mailmd keeps the saved login and doesn't sign in again.",
 		examples: []string{
 			"mailmd connect gmail --client-secret ~/Downloads/client_secret.json",
 			"mailmd connect gmail --account personal --client-secret client_secret.json --no-browser",
@@ -167,7 +171,8 @@ var specs = []spec{
 		long: "Connect an Outlook.com or Microsoft 365 mailbox through Microsoft Graph, with read-only access. You need the client ID of your own app registration in Microsoft Entra. " +
 			"The Outlook guide shows how to create one: https://github.com/vincentsch/mailmd/blob/main/docs/outlook.md\n\n" +
 			"mailmd shows a code, and you enter it on Microsoft's sign-in page in any browser.\n\n" +
-			"To connect an account again, the account name is enough. mailmd then uses the saved client ID and tenant.",
+			"To connect an account again, the account name is enough. mailmd then uses the saved client ID and tenant.\n\n" +
+			"To change a setting of a connected account, like --out or --folder, give the account name and the new setting. mailmd keeps the saved login and doesn't sign in again. A new --client-id or --tenant needs a new sign-in.",
 		examples: []string{
 			"mailmd connect outlook --client-id 12345678-1234-1234-1234-123456789abc",
 			"mailmd connect outlook --account work --client-id 12345678-1234-1234-1234-123456789abc --tenant organizations",

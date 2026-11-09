@@ -198,12 +198,37 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 	if s.caFile, err = m.caFile(c, registry, s.account); err != nil {
 		return err
 	}
+	settings := accounts.Settings{Host: s.host, Port: s.port, Username: s.username, TLSMode: s.tls, CAFile: s.caFile}
+	// IMAP has no way to ask for the address. A login name without an @
+	// says nothing about it, so the address stays empty then.
+	email := s.email
+	if email == "" && strings.Contains(s.username, "@") {
+		email = s.username
+	}
+
+	// A connected account keeps its saved password when the command only
+	// changes settings, like the folders or --out. A new password, or
+	// another server or login name, needs the password.
+	old, saved := savedAccount(opts.root, s.account, "imap")
+	problem := ""
+	if saved && !m.passwordGiven(c) && strings.EqualFold(old.Settings.Host, s.host) && old.Settings.Username == s.username && changesSettings(c, "ca-file", "tls", "port") {
+		next := old
+		next.Settings = settings
+		if email != "" {
+			next.Email = email
+		}
+		done, err := m.changeSettings(f, c, old, next, opts)
+		if done {
+			return err
+		}
+		problem = mdsync.Describe(err, old).Message
+	}
 
 	// Everything else is checked. Only now mailmd asks for the password.
 	if s.known && s.preset.Password != "" && interactive {
 		fmt.Fprintln(f.Stderr, s.preset.Password)
 	}
-	password, err := m.readPassword(f, c, s)
+	password, err := m.readPassword(f, c, s, problem)
 	if err != nil {
 		return connectError(err, "imap")
 	}
@@ -212,13 +237,6 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 	cfg := imap.Config{Host: s.host, Port: s.port, Username: s.username, Password: password, TLSMode: imap.TLSMode(s.tls), RootCAs: m.opts.RootCAs, CAFile: s.caFile}
 	if flagBool(c, "verbose") {
 		cfg.Log = f.Stderr
-	}
-	settings := accounts.Settings{Host: s.host, Port: s.port, Username: s.username, TLSMode: s.tls, CAFile: s.caFile}
-	// IMAP has no way to ask for the address. A login name without an @
-	// says nothing about it, so the address stays empty then.
-	email := s.email
-	if email == "" && strings.Contains(s.username, "@") {
-		email = s.username
 	}
 	var folders []backend.Folder
 	probe := func(ctx context.Context, stage string) (accounts.Settings, string, error) {
@@ -252,16 +270,110 @@ func (m module) connectIMAP(f *rg.Factory, c *cobra.Command, args []string) erro
 			return err
 		}
 		account.Settings, account.Email = settings, email
+		applySettings(c, opts, &account)
 		if err := checkFolders(opts, account, folders); err != nil {
 			return err
 		}
-		return m.writeConnect(f, c, account, opts, folders, true)
+		return m.writeConnect(f, c, account, folders, connectReport{dry: true})
 	}
 	account, err := accounts.Connect(c.Context(), opts.root, s.account, "imap", probe, m.opts.ConnectHooks)
 	if err != nil {
 		return connectError(err, "imap")
 	}
 	return m.finishConnect(f, c, account, opts, folders)
+}
+
+// passwordGiven reports whether connect imap got a password on stdin or in
+// the environment.
+func (m module) passwordGiven(c *cobra.Command) bool {
+	return flagBool(c, "password-stdin") || m.opts.Getenv("MAILMD_IMAP_PASSWORD") != ""
+}
+
+// settingFlags are the connect flags that change what a sync does. A
+// command that gives only these, and no new login, keeps the saved login.
+var settingFlags = []string{"out", "folder", "exclude", "since", "keep-raw", "prefer-text"}
+
+// changesSettings reports whether the command gives one of the setting
+// flags, or one of the extra flags of a provider, like --ca-file for IMAP.
+func changesSettings(c *cobra.Command, extra ...string) bool {
+	for _, name := range append(append([]string(nil), settingFlags...), extra...) {
+		if c.Flags().Changed(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// applySettings puts the settings that the command gives into the account.
+func applySettings(c *cobra.Command, opts connectOptions, a *accounts.AccountConfig) {
+	if opts.archive != "" {
+		a.Root = opts.archive
+	}
+	if c.Flags().Changed("folder") || c.Flags().Changed("exclude") {
+		a.Folders, a.Exclude = opts.filter.Folders, opts.filter.Exclude
+	}
+	if c.Flags().Changed("since") {
+		a.Since = opts.since
+	}
+	if c.Flags().Changed("keep-raw") {
+		a.KeepRaw = flagBool(c, "keep-raw")
+	}
+	if c.Flags().Changed("prefer-text") {
+		a.PreferText = flagBool(c, "prefer-text")
+	}
+}
+
+// changeSettings saves the settings that a connect command gives for a
+// connected account, and keeps the saved login. So connect asks for no
+// password and no sign-in. It logs in with the saved login first, which
+// checks the folder names and a new CA file. next is the account with its
+// new provider settings. When the saved login doesn't work, done is false
+// and err says why, and the caller asks for a new login instead.
+func (m module) changeSettings(f *rg.Factory, c *cobra.Command, old, next accounts.AccountConfig, opts connectOptions) (done bool, err error) {
+	policy := auth.PersistTokens
+	if f.DryRun() {
+		policy = auth.MemoryOnlyTokens
+	}
+	var log io.Writer
+	if flagBool(c, "verbose") {
+		log = f.Stderr
+	}
+	b, err := m.open(c.Context(), opts.root, next, policy, log)
+	var folders []backend.Folder
+	if err == nil {
+		folders, err = b.Folders(c.Context())
+	}
+	err = errors.Join(err, backend.Close(b))
+	if err != nil {
+		if loginFailed(err) {
+			return false, err
+		}
+		return true, accountProblem(err, next)
+	}
+	applySettings(c, opts, &next)
+	if err := checkFolders(opts, next, folders); err != nil {
+		var u *userError
+		if errors.As(err, &u) {
+			u.info.Message = strings.TrimSuffix(u.info.Message, ".") + ". Nothing was saved."
+		}
+		return true, err
+	}
+	if !f.DryRun() {
+		if next, err = accounts.Update(opts.root, old.Name, func(a *accounts.AccountConfig) { *a = next }); err != nil {
+			return true, newUserError(rg.ExitAPI, "The new settings of "+old.Name+" could not be saved", "Run the same connect command again.")
+		}
+	}
+	return true, m.writeConnect(f, c, next, folders, connectReport{dry: f.DryRun(), keptLogin: true})
+}
+
+// loginFailed reports whether the saved login of an account can't be used,
+// so connect needs a new one.
+func loginFailed(err error) bool {
+	switch mdsync.Category(err) {
+	case mdsync.CategoryAuth, mdsync.CategoryCredential:
+		return true
+	}
+	return errors.Is(err, auth.ErrOAuthSetup) || errors.Is(err, auth.ErrInsecurePermission)
 }
 
 func (m module) imapSettings(c *cobra.Command, registry accounts.Registry, interactive bool, ask *asker) (imapSettings, error) {
@@ -440,7 +552,9 @@ func defaultAccountName(r accounts.Registry, s imapSettings) string {
 	}
 }
 
-func (m module) readPassword(f *rg.Factory, c *cobra.Command, s imapSettings) (string, error) {
+// readPassword gets the password from stdin, the environment or a prompt.
+// problem says why the saved password can't be used, when connect tried it.
+func (m module) readPassword(f *rg.Factory, c *cobra.Command, s imapSettings, problem string) (string, error) {
 	if flagBool(c, "password-stdin") {
 		password, err := readPasswordLine(f.Stdin)
 		if err != nil {
@@ -456,8 +570,15 @@ func (m module) readPassword(f *rg.Factory, c *cobra.Command, s imapSettings) (s
 		canPrompt = *m.opts.Interactive
 	}
 	if !canPrompt || f.Flags != nil && f.Flags.NoPrompt {
+		if problem != "" {
+			return "", newUserError(rg.ExitAuth, strings.TrimSuffix(problem, "."),
+				"To save the new settings, mailmd needs the password again. Give it with --password-stdin, or set MAILMD_IMAP_PASSWORD. In a terminal, mailmd asks for it.")
+		}
 		return "", newUserError(rg.ExitUsage, "No password was given",
 			"Pipe it in with --password-stdin, or set MAILMD_IMAP_PASSWORD. In a terminal, mailmd asks for it.")
+	}
+	if problem != "" {
+		fmt.Fprintln(f.Stderr, problem)
 	}
 	password, err := m.opts.PasswordPrompt(c.Context(), f.Stdin, f.Stderr, "Password for "+s.username)
 	if c.Context().Err() != nil {
@@ -523,49 +644,43 @@ func (m module) finishConnect(f *rg.Factory, c *cobra.Command, a accounts.Accoun
 		u.info.Hint += ". Run the connect command again with the right folder."
 		return u
 	}
-	if opts.archive != "" || len(opts.filter.Folders) > 0 || len(opts.filter.Exclude) > 0 || opts.since != "" || c.Flags().Changed("keep-raw") || c.Flags().Changed("prefer-text") {
-		updated, err := accounts.Update(opts.root, a.Name, func(acc *accounts.AccountConfig) {
-			if opts.archive != "" {
-				acc.Root = opts.archive
-			}
-			if c.Flags().Changed("folder") || c.Flags().Changed("exclude") {
-				acc.Folders, acc.Exclude = opts.filter.Folders, opts.filter.Exclude
-			}
-			if c.Flags().Changed("since") {
-				acc.Since = opts.since
-			}
-			if c.Flags().Changed("keep-raw") {
-				acc.KeepRaw = flagBool(c, "keep-raw")
-			}
-			if c.Flags().Changed("prefer-text") {
-				acc.PreferText = flagBool(c, "prefer-text")
-			}
-		})
+	if changesSettings(c) {
+		updated, err := accounts.Update(opts.root, a.Name, func(acc *accounts.AccountConfig) { applySettings(c, opts, acc) })
 		if err != nil {
 			return newUserError(rg.ExitAPI, "The account was connected, but its settings could not be saved", "Run the same connect command again.")
 		}
 		a = updated
 	}
-	return m.writeConnect(f, c, a, opts, folders, false)
+	return m.writeConnect(f, c, a, folders, connectReport{})
 }
 
-func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, opts connectOptions, folders []backend.Folder, dry bool) error {
-	root := opts.archive
-	if root == "" {
-		root = a.Root
-	}
+// archiveOf returns the archive folder of an account.
+func (m module) archiveOf(a accounts.AccountConfig) string {
+	root := a.Root
 	if root == "" {
 		root, _ = m.defaultRoot()
 	}
-	filter := mdsync.Filter{Folders: a.Folders, Exclude: a.Exclude}
-	if len(opts.filter.Folders) > 0 || len(opts.filter.Exclude) > 0 {
-		filter = opts.filter
-	}
+	return filepath.Join(root, a.ArchiveDir)
+}
+
+// connectReport says how a connect went, for its output.
+type connectReport struct {
+	dry bool
+	// keptLogin is set when only settings changed, and the saved login
+	// stayed.
+	keptLogin bool
+}
+
+// writeConnect prints the result of a connect. a has the settings that a
+// sync uses from now on, or would use after a dry run.
+func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.AccountConfig, folders []backend.Folder, report connectReport) error {
+	dry := report.dry
 	result := ConnectResult{
 		Schema: "mailmd-connect/1", Account: a.Name, Backend: a.Backend, Provider: providerName(a.Backend),
-		Address: a.Email, Archive: filepath.Join(root, a.ArchiveDir), DryRun: dry, LeftOut: []string{},
+		Address: a.Email, Archive: m.archiveOf(a), DryRun: dry, LeftOut: []string{},
 		CAFile: a.Settings.CAFile, Next: "mailmd sync " + a.Name,
 	}
+	filter := mdsync.Filter{Folders: a.Folders, Exclude: a.Exclude}
 	filter = filter.ForFolders(folders)
 	for _, folder := range folders {
 		if !folder.Fetchable {
@@ -582,14 +697,23 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 			"The files won't list Gmail's labels. If you want the labels, use mailmd connect gmail instead."
 	}
 	home := m.home()
+	login := "login"
+	if a.Backend == "imap" {
+		login = "password"
+	}
 	render := func(w io.Writer) {
-		if dry {
+		who := result.Provider
+		if result.Address != "" {
+			who = result.Address
+		}
+		switch {
+		case dry && report.keptLogin:
+			fmt.Fprintf(w, "The saved %s still works. Nothing was saved because of --dry-run.\n", login)
+		case dry:
 			fmt.Fprintf(w, "The login works. Nothing was saved because of --dry-run.\n")
-		} else {
-			who := result.Provider
-			if result.Address != "" {
-				who = result.Address
-			}
+		case report.keptLogin:
+			fmt.Fprintf(w, "Changed the settings of %s (%s) and kept its saved %s.\n", a.Name, who, login)
+		default:
 			fmt.Fprintf(w, "Connected %s (%s).\n", a.Name, who)
 		}
 		if result.Folders > 0 {

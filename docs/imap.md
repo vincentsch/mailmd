@@ -149,16 +149,33 @@ not synced at all.
 
 ## Changing settings later
 
-Run `mailmd connect imap` again with the same `--account` name and the new
-settings. mailmd checks the new login before it replaces the old one. Your
-archive and its sync state stay as they are.
+To change a setting, run `mailmd connect imap` with the account name and
+the new setting:
 
-For a new password, the account name is enough. mailmd takes the server,
-the login name and the CA file from the saved account:
+```sh
+mailmd connect imap --account work --exclude Newsletters
+```
+
+mailmd keeps the saved password and doesn't ask for it, also with
+`--dry-run`. It logs in with the saved password to check the new settings,
+then saves them. Settings you don't give stay as they are, and so do your
+archive and its sync state.
+
+mailmd needs the password again only when you give another `--host` or
+`--username`, because that is a new login. It checks the new login before it
+replaces the old one.
+
+For a new password, give only the account name. mailmd takes the server,
+the login name and the CA file from the saved account and asks for the
+password:
 
 ```sh
 mailmd connect imap --account work
 ```
+
+When the server no longer accepts the saved password, a connect that
+changes settings says so and asks for the new password. A script then gives
+it with `--password-stdin`.
 
 To use another CA file, add `--ca-file` with the new file. To stop using
 one, add `--ca-file ''`.

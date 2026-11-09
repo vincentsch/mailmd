@@ -341,3 +341,63 @@ func TestConnectIMAPChecksTheCAFileBeforeThePassword(t *testing.T) {
 		}
 	}
 }
+
+// Changing a setting of a connected account keeps its saved password, also
+// in a dry run. Only a new password or another login needs one.
+func TestChangingSettingsKeepsTheSavedPassword(t *testing.T) {
+	server := imaptest.Start(t, imaptest.Options{})
+	root, home := t.TempDir(), t.TempDir()
+	no := false
+	opts := Options{ConfigRoot: root, HomeDir: home, RootCAs: server.CertPool(), Interactive: &no}
+	if code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--email", "dana@example.com", "--password-stdin")...); code != 0 {
+		t.Fatalf("connect %d %s %s", code, stdout, stderr)
+	}
+	opts.PasswordPrompt = func(context.Context, io.Reader, io.Writer, string) (string, error) {
+		t.Fatal("asked for the password")
+		return "", nil
+	}
+	registry := filepath.Join(root, "mailmd", "accounts.json")
+	before, _ := os.ReadFile(registry)
+	code, stdout, stderr := invoke(t, opts, "", "connect", "imap", "--account", "work", "--folder", "INBOX", "--out", "~/archive", "--dry-run", "--no-prompt")
+	if code != 0 || !strings.Contains(stdout, "The saved password still works. Nothing was saved because of --dry-run.") || !strings.Contains(stdout, "Mail goes to ~/archive/work.") {
+		t.Fatalf("dry run %d %s %s", code, stdout, stderr)
+	}
+	if after, _ := os.ReadFile(registry); string(after) != string(before) {
+		t.Fatalf("the dry run changed accounts.json:\n%s", after)
+	}
+	code, stdout, stderr = invoke(t, opts, "", "connect", "imap", "--account", "work", "--folder", "INBOX", "--out", "~/archive", "--no-prompt")
+	if code != 0 || !strings.Contains(stdout, "Changed the settings of work (dana@example.com) and kept its saved password.") || !strings.Contains(stdout, "Next: mailmd sync work") {
+		t.Fatalf("change %d %s %s", code, stdout, stderr)
+	}
+	r, _ := accounts.Load(root)
+	if a := r.Accounts[0]; a.Root != filepath.Join(home, "archive") || strings.Join(a.Folders, ",") != "INBOX" || a.Settings.Host != server.Host() || a.Email != "dana@example.com" {
+		t.Fatalf("saved account = %+v", a)
+	}
+	if code, stdout, stderr = invoke(t, opts, "", "sync", "work"); code != 0 {
+		t.Fatalf("sync %d %s %s", code, stdout, stderr)
+	}
+
+	// Another login name is a new login, so it needs the password.
+	code, _, stderr = invoke(t, opts, "", "connect", "imap", "--account", "work", "--host", server.Host(), "--port", strconv.Itoa(server.Port()), "--username", "someone-else", "--since", "30d", "--no-prompt")
+	if code != 1 || !strings.Contains(stderr, "No password was given") {
+		t.Fatalf("another login name: %d %s", code, stderr)
+	}
+
+	// When the server rejects the saved password, connect says so and
+	// needs the new one.
+	if err := accounts.StoreIMAPCredential(root, "work", "PASSWORD_SENTINEL"); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr = invoke(t, opts, "", "connect", "imap", "--account", "work", "--since", "30d", "--no-prompt")
+	if code != 3 || !strings.Contains(stderr, "rejected the login") || !strings.Contains(stderr, "To save the new settings, mailmd needs the password again.") {
+		t.Fatalf("rejected password: %d %s %s", code, stdout, stderr)
+	}
+	sweep(t, stdout, stderr)
+	code, stdout, stderr = invoke(t, opts, server.Password()+"\n", "connect", "imap", "--account", "work", "--since", "30d", "--password-stdin")
+	if code != 0 || !strings.Contains(stdout, "Connected work (dana@example.com).") {
+		t.Fatalf("new password: %d %s %s", code, stdout, stderr)
+	}
+	if r, _ = accounts.Load(root); r.Accounts[0].Since != "30d" || strings.Join(r.Accounts[0].Folders, ",") != "INBOX" {
+		t.Fatalf("after the new password = %+v", r.Accounts[0])
+	}
+}

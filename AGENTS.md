@@ -118,6 +118,13 @@ the user types the new password. For Gmail and Outlook, it is
 `mailmd connect outlook --account <name>`. mailmd uses the client it saved,
 so the user needs no client file or client ID for that.
 
+To change a setting later, like the folders a sync copies or the archive
+folder, run the connect command with `--account <name>` and the new
+setting, like `mailmd connect imap --account work --exclude Newsletters`.
+mailmd keeps the saved password or login and asks for nothing, so you can
+run it yourself. Run it with `--dry-run` first and show the user what it
+says. Only another `--host` or `--username` needs the password again.
+
 When the user wants to remove an account, run
 `mailmd disconnect <account> --dry-run` and show the user which files it
 would delete. Run it without `--dry-run` only when the user agrees. It

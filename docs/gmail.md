@@ -122,6 +122,17 @@ mailmd connect gmail --account personal
 
 A new file that you give with `--client-secret` replaces the saved client.
 
+To change a setting, like `--out` or `--folder`, give the account name and
+the new setting. mailmd keeps the saved login and doesn't open the sign-in
+page:
+
+```sh
+mailmd connect gmail --account personal --exclude Newsletters
+```
+
+If Google ended the login in the meantime, mailmd signs in again and then
+saves the new settings.
+
 ### On a server or another computer without a browser
 
 ```sh

@@ -660,3 +660,96 @@ func TestConfigRootComesFromTheEnvironment(t *testing.T) {
 		t.Fatalf("--config-root: %d %s", code, stdout)
 	}
 }
+
+// Changing a setting of a Gmail or Outlook account keeps its saved login,
+// so connect doesn't sign in again.
+func TestChangingSettingsKeepsTheOAuthLogin(t *testing.T) {
+	t.Run("gmail", func(t *testing.T) {
+		server := fakeGoogle(t)
+		defer server.Close()
+		root, home := t.TempDir(), t.TempDir()
+		client := filepath.Join(root, "client_secret.json")
+		if err := os.WriteFile(client, []byte(desktopClient), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		opts := Options{ConfigRoot: root, HomeDir: home, HTTPClient: &http.Client{Transport: rewriteTransport{base: server.URL, transport: http.DefaultTransport}}, HandleAuthURL: googleConsent}
+		if code, stdout, stderr := invoke(t, opts, "", "connect", "gmail", "--client-secret", client); code != 0 {
+			t.Fatalf("connect %d %s %s", code, stdout, stderr)
+		}
+		opts.HandleAuthURL = func(context.Context, string) error {
+			t.Fatal("signed in again")
+			return nil
+		}
+		code, stdout, stderr := invoke(t, opts, "", "connect", "gmail", "--out", "~/archive", "--since", "2y")
+		if code != 0 || !strings.Contains(stdout, "Changed the settings of gmail (dana@gmail.example) and kept its saved login.") || !strings.Contains(stdout, "Mail goes to ~/archive/gmail.") {
+			t.Fatalf("change %d %s %s", code, stdout, stderr)
+		}
+		sweep(t, stdout, stderr)
+		if r, _ := accounts.Load(root); r.Accounts[0].Root != filepath.Join(home, "archive") || r.Accounts[0].Since != "2y" {
+			t.Fatalf("saved account = %+v", r.Accounts[0])
+		}
+	})
+	t.Run("gmail login ended", func(t *testing.T) {
+		// Google ended the login, so the first request after connect gets
+		// a 401. A new sign-in brings a new token, which works.
+		revoked := false
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch {
+			case r.URL.Path == "/token":
+				revoked = false
+				io.WriteString(w, `{"access_token":"ACCESS_TOKEN_SENTINEL","refresh_token":"REFRESH_TOKEN_SENTINEL","token_type":"Bearer","expires_in":3600,"scope":"https://www.googleapis.com/auth/gmail.readonly"}`)
+			case revoked:
+				w.WriteHeader(http.StatusUnauthorized)
+				io.WriteString(w, `{"error":{"code":401,"message":"Invalid Credentials","status":"UNAUTHENTICATED"}}`)
+			case r.URL.Path == "/gmail/v1/users/me/labels":
+				io.WriteString(w, `{"labels":[{"id":"INBOX","name":"INBOX","type":"system"}]}`)
+			case r.URL.Path == "/gmail/v1/users/me/profile":
+				io.WriteString(w, `{"emailAddress":"dana@gmail.example","historyId":"7"}`)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer server.Close()
+		root := t.TempDir()
+		client := filepath.Join(root, "client_secret.json")
+		if err := os.WriteFile(client, []byte(desktopClient), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		signIns := 0
+		opts := Options{ConfigRoot: root, HTTPClient: &http.Client{Transport: rewriteTransport{base: server.URL, transport: http.DefaultTransport}},
+			HandleAuthURL: func(ctx context.Context, address string) error { signIns++; return googleConsent(ctx, address) }}
+		if code, stdout, stderr := invoke(t, opts, "", "connect", "gmail", "--client-secret", client); code != 0 {
+			t.Fatalf("connect %d %s %s", code, stdout, stderr)
+		}
+		revoked = true
+		code, stdout, stderr := invoke(t, opts, "", "connect", "gmail", "--since", "2y")
+		if code != 0 || signIns != 2 || !strings.Contains(stderr, "mailmd signs in again and then saves the new settings.") || !strings.Contains(stdout, "Connected gmail") {
+			t.Fatalf("change %d (%d sign-ins) %s %s", code, signIns, stdout, stderr)
+		}
+		if r, _ := accounts.Load(root); r.Accounts[0].Since != "2y" {
+			t.Fatalf("saved account = %+v", r.Accounts[0])
+		}
+	})
+	t.Run("outlook", func(t *testing.T) {
+		server := fakeMicrosoft(t, `{"mail":"dana@contoso.example"}`)
+		defer server.Close()
+		signIns := 0
+		opts := Options{ConfigRoot: t.TempDir(), IdentityBaseURL: server.URL, GraphBaseURL: server.URL + "/v1.0", HTTPClient: server.Client(),
+			HandleDeviceCode: func(context.Context, auth.DeviceCodePrompt) error { signIns++; return nil }}
+		if code, stdout, stderr := invoke(t, opts, "", "connect", "outlook", "--client-id", "12345678-1234-1234-1234-123456789abc"); code != 0 {
+			t.Fatalf("connect %d %s %s", code, stdout, stderr)
+		}
+		code, stdout, stderr := invoke(t, opts, "", "connect", "outlook", "--exclude", "Inbox", "--dry-run")
+		if code != 0 || !strings.Contains(stdout, "The saved login still works. Nothing was saved because of --dry-run.") || !strings.Contains(stdout, "leaves out Inbox and Junk Email") {
+			t.Fatalf("dry run %d %s %s", code, stdout, stderr)
+		}
+		// A new tenant is a new login.
+		if code, stdout, stderr := invoke(t, opts, "", "connect", "outlook", "--tenant", "organizations", "--prefer-text"); code != 0 {
+			t.Fatalf("new tenant %d %s %s", code, stdout, stderr)
+		}
+		if signIns != 2 {
+			t.Fatalf("signed in %d times, want 2", signIns)
+		}
+	})
+}

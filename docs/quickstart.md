@@ -138,8 +138,8 @@ tells you about it.
 These flags work on `mailmd sync` for one run, and mailmd doesn't save them.
 On `sync`, `--folder` and `--exclude` replace the ones saved with the account
 for that run. Give the flags to `mailmd connect` to save them for the
-account. To change them later, run the same connect command again with the
-new flags.
+account. To change them later, run `mailmd connect` with the account name
+and the new flags. mailmd keeps the saved password or login.
 
 `--folder` also syncs a folder that is left out by default. So
 `mailmd sync fastmail --folder Spam` copies the spam folder once, and the

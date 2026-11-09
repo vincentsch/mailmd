@@ -129,6 +129,14 @@ mailmd connect outlook --account work
 A new `--client-id` or `--tenant` replaces the saved one. With a new client
 ID, mailmd uses the default tenant unless you also give `--tenant`.
 
+To change a setting, like `--out` or `--folder`, give the account name and
+the new setting. mailmd keeps the saved login and doesn't show a sign-in
+code. A new `--client-id` or `--tenant` needs a new sign-in:
+
+```sh
+mailmd connect outlook --account work --since 2y
+```
+
 ## How syncing works with Graph
 
 Each Outlook folder becomes a folder in the archive. mailmd asks Graph for

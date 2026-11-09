@@ -14,6 +14,7 @@ mailmd connect imap
 mailmd connect imap --email you@fastmail.com
 mailmd connect imap --account work --host imap.example.com --username you@example.com
 printf '%s\n' "$PASSWORD" | mailmd connect imap --email you@example.com --host imap.example.com --password-stdin
+mailmd connect imap --account work --out ~/Documents/mail
 mailmd connect imap --account work
 ```
 

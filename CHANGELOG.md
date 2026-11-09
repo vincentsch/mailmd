@@ -9,6 +9,7 @@ First release of mailmd.
 - Connect Gmail through the Gmail API and Outlook through Microsoft Graph with read-only access.
 - Trust a server's own certificate authority with `--ca-file`. mailmd saves the file with the account and uses it for every sync.
 - Connect an account again with only its name. mailmd uses the saved server settings, OAuth client or client ID.
+- Change a setting of a connected account with `mailmd connect`, the account name and the new setting. mailmd keeps the saved password or login, also with `--dry-run`.
 - Remove an account and its saved login with `mailmd disconnect`. The archive stays. For Gmail and Outlook, mailmd says where to remove the app's access in your Google or Microsoft account.
 - Show each account's email address in `mailmd status` and `mailmd list accounts`. mailmd asks Gmail and Microsoft for it, and takes it from `--email` for IMAP.
 - Sync all accounts with `mailmd sync`, fetching only new mail and updating changed flags.
