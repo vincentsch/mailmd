@@ -328,6 +328,9 @@ func renderSyncResult(w io.Writer, r mdsync.Result, home string, several bool) {
 			fmt.Fprintf(w, "%s changed, and mailmd updated %s.\n", plural(r.Updated, "message", "messages"), files)
 		}
 	}
+	if r.NoReadMarks {
+		fmt.Fprintln(w, "None of these messages is marked as read or answered. "+noReadMarksCause)
+	}
 	for _, line := range warnings(r) {
 		fmt.Fprintln(w, line)
 	}

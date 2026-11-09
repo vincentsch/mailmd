@@ -211,7 +211,9 @@ if the user agrees:
 - Messages with the same `thread_id` belong to one conversation. Read the
   whole thread before you summarize it.
 - A message without `flags` is unread. Some servers keep no flags, and then
-  every message looks unread. To tell whether the user answered a message,
+  every message looks unread. `mailmd status <account>` has a `Flags` line
+  when no message is marked as read or answered. Then don't tell the user
+  that their mail is unread. To tell whether the user answered a message,
   look for their reply in the same thread, usually in the Sent folder.
 - A file with `deleted_on_server` in its frontmatter was deleted on the
   server. It may be an old version of a draft. Say so when you use it.

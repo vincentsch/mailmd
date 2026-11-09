@@ -87,9 +87,13 @@ type Result struct {
 	Folders     []FolderResult                   `json:"folders"`
 	Diagnostics map[backend.DiagnosticReason]int `json:"diagnostics"`
 	Retries     int                              `json:"retries"`
-	Started     time.Time                        `json:"started"`
-	Seconds     float64                          `json:"seconds"`
-	Error       *ErrorInfo                       `json:"error"`
+	// NoReadMarks is set after the first sync of an archive when none of
+	// its messages is marked as read or answered. Either they are all
+	// unread, or the server doesn't keep these marks.
+	NoReadMarks bool       `json:"no_read_marks"`
+	Started     time.Time  `json:"started"`
+	Seconds     float64    `json:"seconds"`
+	Error       *ErrorInfo `json:"error"`
 }
 
 // FolderResult describes one folder of a sync.
@@ -168,6 +172,9 @@ type run struct {
 	// existed holds the refs of the last batch whose file was in the
 	// archive before.
 	existed map[string]bool
+	// first is set when the archive had no sync state yet. marked is set
+	// when a message is marked as read or answered.
+	first, marked bool
 }
 
 // Run syncs one account. It returns the result also when it fails.
@@ -194,6 +201,7 @@ func Run(ctx context.Context, opts Options) (Result, error) {
 		return r.result, &RunError{Info: info, Cause: err}
 	}
 	r.result.Outcome = r.outcome()
+	r.result.NoReadMarks = r.first && r.result.New > 0 && !r.marked
 	return r.result, nil
 }
 
@@ -237,6 +245,7 @@ func (r *run) run(ctx context.Context) error {
 	if r.state, r.saved, err = LoadState(r.dir, r.opts.Account.Backend); err != nil {
 		return err
 	}
+	r.first = r.saved == nil
 	if err := r.loadIndex(); err != nil {
 		return err
 	}
@@ -619,6 +628,7 @@ func (r *run) write(ctx context.Context, j job, fr *FolderResult, messages []mai
 		if j.shared {
 			r.stayInPlace(&m)
 		}
+		r.marked = r.marked || m.Flags.Seen || m.Flags.Answered
 		if r.opts.Account.Backend == "imap" {
 			r.joinThread(&m)
 		}

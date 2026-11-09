@@ -99,7 +99,9 @@ server keeps and adds none of its own. A server that keeps no flags sends
 none, so every message from it looks unread in the archive, and mailmd can't
 tell that apart from mail you haven't read. Mail that a program copied onto
 the server, like an import from another provider, can also come without
-flags.
+flags. When no message of an account is marked as read or answered, the
+first sync says so, and `mailmd status <account>` shows it in its `Flags`
+line. In `mailmd status --json`, `no_read_marks` is then `true`.
 
 Only IMAP servers report `answered`, and only when your mail program set it
 as you replied. To find out whether you answered a message, look for your

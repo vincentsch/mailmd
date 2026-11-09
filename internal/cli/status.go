@@ -111,6 +111,14 @@ func renderStatus(w io.Writer, out StatusOutput, home string, now time.Time, det
 			fmt.Fprintf(t, "  Messages\tnone yet. Run: mailmd sync %s\n", s.Account)
 		default:
 			fmt.Fprintf(t, "  Messages\t%s in %s\n", count(s.Messages), plural(len(s.Folders), "folder", "folders"))
+			if s.NoReadMarks {
+				none := fmt.Sprintf("none of the %s messages is", count(s.Messages))
+				if s.Messages == 1 {
+					none = "the message is not"
+				}
+				fmt.Fprintf(t, "  Flags\t%s marked as read or answered\n", none)
+				fmt.Fprintf(t, "  \t%s\n", noReadMarksCause)
+			}
 		}
 		if s.LastSync != nil {
 			last := ago(s.LastSync.Finished, now) + ", " + outcomeText(s.LastSync.Outcome)
@@ -166,6 +174,10 @@ func renderStatus(w io.Writer, out StatusOutput, home string, now time.Time, det
 		}
 	}
 }
+
+// noReadMarksCause explains an archive where no message is marked as read
+// or answered, so nobody takes that for a mailbox of unread mail.
+const noReadMarksCause = "Either they are all unread, or the server doesn't keep these marks."
 
 func outcomeText(outcome string) string {
 	switch outcome {

@@ -25,6 +25,7 @@ First release of mailmd.
 - When an invite has no text, write the details of its event and its agenda into the file.
 - Escape plain text, so a Markdown viewer never loads images or HTML from it.
 - Join IMAP replies to their thread when References was cut short.
+- Say in the first sync and in `mailmd status` when no message is marked as read or answered, so nobody takes the missing flags for unread mail.
 - Show progress in a terminal and print one summary line per account. It says how many folders the sync checked, and names them when `--folder` chose them.
 - Explain errors with their cause and the next step.
 - Try the output with `mailmd demo`, without an account.

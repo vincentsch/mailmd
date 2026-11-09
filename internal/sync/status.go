@@ -2,6 +2,7 @@ package sync
 
 import (
 	"os"
+	"slices"
 	"sort"
 
 	"github.com/vincentsch/mailmd/internal/accounts"
@@ -27,6 +28,10 @@ type StatusResult struct {
 	// Problems lists the most recent messages that were left out or saved
 	// only in part.
 	Problems []Diagnostic `json:"problem_messages"`
+	// NoReadMarks is set when the archive has messages and none of them is
+	// marked as read or answered. Either they are all unread, or the server
+	// doesn't keep these marks.
+	NoReadMarks bool `json:"no_read_marks"`
 }
 
 // FolderStatus counts the messages of one archive folder.
@@ -67,12 +72,15 @@ func Status(root string, a accounts.AccountConfig) (StatusResult, error) {
 		return r, err
 	}
 	counts := map[string]int{}
+	marked := false
 	for _, e := range entries {
 		counts[e.Folder]++
 		if e.Gone {
 			r.Deleted++
 		}
+		marked = marked || slices.Contains(e.Flags, "seen") || slices.Contains(e.Flags, "answered")
 	}
+	r.NoReadMarks = len(entries) > 0 && !marked
 	for folder, n := range counts {
 		r.Folders = append(r.Folders, FolderStatus{Path: folder, Messages: n})
 		r.Messages += n
