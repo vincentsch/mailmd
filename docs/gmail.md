@@ -22,6 +22,17 @@ it.
 
 Button and menu names below are in quotes, the way Google shows them.
 
+mailmd was tested live on 2026-11-08 with a Google Workspace account and its
+own Desktop app client. These worked:
+
+- connecting, with Google's warning screen for an app it hasn't verified
+- the first sync, and later syncs with new mail, new labels and messages moved
+  to Trash
+- attachments, and the labels listed in each file
+- `mailmd disconnect`
+
+A personal @gmail.com account was not part of that test.
+
 ## 1. Create a Google Cloud project
 
 1. Open the [Google Cloud console](https://console.cloud.google.com/) and sign
