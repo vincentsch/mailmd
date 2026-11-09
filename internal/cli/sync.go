@@ -29,15 +29,22 @@ func (m module) syncCommand(cmd *rg.Command) {
 	cmd.Args = cobra.ArbitraryArgs
 	cmd.Configure = func(c *cobra.Command) {
 		c.Flags().String("out", "", "Write to this folder for this run instead of the account's saved folder")
-		addFilterFlags(c)
+		addFilterFlags(c, false)
 		c.Flags().Int64("max-message-bytes", backend.DefaultMaxMessageBytes, "Save only the headers of a message larger than this many bytes")
 	}
 	cmd.Run = m.sync
 }
 
-func addFilterFlags(c *cobra.Command) {
-	c.Flags().StringArray("folder", nil, "Sync only this folder and its subfolders, like INBOX or 'Work/*' (repeat for more)")
-	c.Flags().StringArray("exclude", nil, "Leave out this folder and its subfolders (repeat for more)")
+// addFilterFlags adds the flags that choose what a sync fetches. connect
+// saves them with the account, and sync uses them for one run.
+func addFilterFlags(c *cobra.Command, saved bool) {
+	if saved {
+		c.Flags().StringArray("folder", nil, "Sync only this folder and its subfolders, like INBOX or 'Work/*'. mailmd saves it with the account (repeat for more)")
+		c.Flags().StringArray("exclude", nil, "Leave out this folder and its subfolders. mailmd saves it with the account (repeat for more)")
+	} else {
+		c.Flags().StringArray("folder", nil, "Sync only this folder and its subfolders in this run, like INBOX or Junk. It isn't saved (repeat for more)")
+		c.Flags().StringArray("exclude", nil, "Leave out this folder and its subfolders in this run. It isn't saved (repeat for more)")
+	}
 	c.Flags().String("since", "", "Fetch only mail received on or after this day, like 2025-01-31, or within an age like 30d, 12m or 2y")
 	c.Flags().Bool("keep-raw", false, "Also save each original message as an .eml file next to its Markdown file")
 	c.Flags().Bool("prefer-text", false, "Use the plain text part of a message instead of converting its HTML part")
@@ -85,7 +92,7 @@ func (m module) sync(f *rg.Factory, c *cobra.Command, args []string) error {
 		result, err := mdsync.Run(c.Context(), p.opts)
 		printer.finish(result)
 		if !p.opts.DryRun {
-			info := accounts.LastSync{Started: result.Started, Finished: m.opts.Clock(), Outcome: result.Outcome, New: result.New}
+			info := accounts.LastSync{Started: result.Started, Finished: m.opts.Clock(), Outcome: result.Outcome, New: result.New, Checked: checkedFolders(result)}
 			if result.Error != nil {
 				info.Error = result.Error.Message
 			}
@@ -250,50 +257,58 @@ func renderSync(w io.Writer, out SyncOutput, home string, several, quiet bool) {
 	}
 }
 
-func renderSyncResult(w io.Writer, r mdsync.Result, home string, several bool) {
-	where := shortPath(r.Archive, home)
-	// The line about new mail counts the folders that got new mail, like
-	// mailmd status counts the folders that have mail. The up-to-date line
-	// counts the folders that were checked.
-	synced, withNew := 0, 0
+// checkedFolders returns the folders a sync copied new mail from.
+func checkedFolders(r mdsync.Result) []string {
+	out := []string{}
 	for _, f := range r.Folders {
 		if f.Status == "synced" {
-			synced++
-		}
-		if f.New > 0 {
-			withNew++
+			out = append(out, f.Path)
 		}
 	}
-	folders := plural(withNew, "folder", "folders")
-	checked := plural(synced, "folder", "folders")
-	inFolders := " in " + folders
+	return out
+}
+
+// checkedText says which folders a sync checked, like "4 folders". It
+// names them when --folder chose them, like "Junk", so a sync of a few
+// folders says which ones.
+func checkedText(r mdsync.Result) string {
+	checked := checkedFolders(r)
 	// Gmail syncs all its labels as one scope, so a folder count would
 	// always say 1 while the files land in Inbox, Sent and the rest.
-	if len(r.Folders) == 1 && r.Folders[0].Path == mdsync.AllMailPath {
-		folders, checked, inFolders = "all mail", "all mail", ""
+	if len(checked) == 1 && checked[0] == mdsync.AllMailPath {
+		return "all mail"
 	}
+	for _, f := range r.Folders {
+		if f.Reason == mdsync.ReasonNotNamed && len(checked) > 0 {
+			return joinNames(checked)
+		}
+	}
+	return plural(len(checked), "folder", "folders")
+}
+
+func renderSyncResult(w io.Writer, r mdsync.Result, home string, several bool) {
+	where := shortPath(r.Archive, home)
+	checked := checkedText(r)
+	newMail := plural(r.New, "new message", "new messages")
 	prefix := ""
 	if several {
 		prefix = r.Account + ": "
 	}
 	switch {
 	case r.Outcome == mdsync.OutcomeInterrupted:
-		fmt.Fprintf(w, "%sStopped after %s. The next sync continues from there.\n", prefix, plural(r.New, "new message", "new messages"))
+		fmt.Fprintf(w, "%sStopped after %s. The next sync continues from there.\n", prefix, newMail)
 	case r.Error != nil:
 		if r.New > 0 {
-			fmt.Fprintf(w, "%sSaved %s to %s before the sync stopped.\n", prefix, plural(r.New, "new message", "new messages"), where)
+			fmt.Fprintf(w, "%sSaved %s to %s before the sync stopped.\n", prefix, newMail, where)
 		}
 	case r.DryRun && r.New > 0:
-		fmt.Fprintf(w, "%smailmd would save %s from %s to %s. Nothing was written because of --dry-run.\n", prefix, plural(r.New, "new message", "new messages"), folders, where)
+		fmt.Fprintf(w, "%smailmd checked %s and would save %s to %s. Nothing was written because of --dry-run.\n", prefix, checked, newMail, where)
 	case r.New > 0:
-		verb := "Synced"
-		if several {
-			verb = "synced"
-		}
-		fmt.Fprintf(w, "%s%s %s%s to %s in %s.\n", prefix, verb, plural(r.New, "new message", "new messages"), inFolders, where, seconds(r.Seconds))
+		fmt.Fprintf(w, "%smailmd checked %s and saved %s to %s in %s.\n", prefix, checked, newMail, where, seconds(r.Seconds))
+	case r.DryRun:
+		fmt.Fprintf(w, "%s has no new mail. mailmd checked %s in %s. Nothing was written because of --dry-run.\n", r.Account, checked, seconds(r.Seconds))
 	default:
-		name := r.Account
-		fmt.Fprintf(w, "%s is up to date. mailmd checked %s in %s.\n", name, checked, seconds(r.Seconds))
+		fmt.Fprintf(w, "%s is up to date. mailmd checked %s in %s.\n", r.Account, checked, seconds(r.Seconds))
 	}
 	if r.Updated > 0 {
 		files := map[bool]string{true: "its file", false: "their files"}[r.Updated == 1]

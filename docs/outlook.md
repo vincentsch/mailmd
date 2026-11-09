@@ -110,7 +110,7 @@ accept, mailmd shows the mailbox's address and how many folders it found:
 
 ```text
 Connected outlook (dana@contoso.com).
-The mailbox has 12 folders. A sync leaves out Deleted Items and Junk Email.
+The mailbox has 12 folders. A sync copies 10 of them and leaves out Deleted Items and Junk Email.
 Mail goes to ~/mail/outlook.
 
 Next: mailmd sync outlook

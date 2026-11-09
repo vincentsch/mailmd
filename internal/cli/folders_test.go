@@ -95,3 +95,41 @@ func TestListFoldersNeedsANameWithSeveralAccounts(t *testing.T) {
 		t.Fatalf("expired login %d %s", code, stderr)
 	}
 }
+
+// The counts of connect, sync and status agree, and a dry run of one folder
+// that a sync leaves out says how much new mail it has.
+func TestFolderCountsAgreeAndADryRunCountsNewMail(t *testing.T) {
+	server := imaptest.Start(t, imaptest.Options{Folders: officeFolders()})
+	root, home := t.TempDir(), t.TempDir()
+	opts := Options{ConfigRoot: root, HomeDir: home, RootCAs: server.CertPool()}
+	code, stdout, stderr := invoke(t, opts, server.Password()+"\n", imapArgs(server, "--account", "work", "--password-stdin")...)
+	if code != 0 || !strings.Contains(stdout, "The mailbox has 6 folders. A sync copies 4 of them and leaves out Junk and Trash.") {
+		t.Fatalf("connect %d %s %s", code, stdout, stderr)
+	}
+	if _, stdout, _ = invoke(t, opts, "", "sync"); !strings.Contains(stdout, "mailmd checked 4 folders and saved 4 new messages to ~/mail/work") {
+		t.Fatalf("sync:\n%s", stdout)
+	}
+	_, stdout, _ = invoke(t, opts, "", "status", "work")
+	if !strings.Contains(stdout, "Messages   4 in 3 folders") || !strings.Contains(stdout, "checked 4 folders, 4 new") {
+		t.Fatalf("status:\n%s", stdout)
+	}
+	_, stdout, _ = invoke(t, opts, "", "sync", "work", "--folder", "Junk", "--dry-run")
+	if !strings.Contains(stdout, "mailmd checked Junk and would save 1 new message to ~/mail/work. Nothing was written because of --dry-run.") {
+		t.Fatalf("dry run of Junk:\n%s", stdout)
+	}
+	_, stdout, _ = invoke(t, opts, "", "sync", "work", "--folder", "Trash", "--dry-run")
+	if !strings.Contains(stdout, "work has no new mail. mailmd checked Trash in") {
+		t.Fatalf("dry run of Trash:\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(home, "mail", "work", "Junk")); !os.IsNotExist(err) {
+		t.Fatalf("the dry run wrote Junk: %v", err)
+	}
+	// --folder on sync is for that run only. The next sync leaves Junk out
+	// again, and status still shows the last real sync.
+	if _, stdout, _ = invoke(t, opts, "", "sync"); !strings.Contains(stdout, "work is up to date. mailmd checked 4 folders") {
+		t.Fatalf("sync after the dry runs:\n%s", stdout)
+	}
+	if r, _ := accounts.Load(root); len(r.Accounts[0].Folders) != 0 {
+		t.Fatalf("sync saved --folder: %+v", r.Accounts[0])
+	}
+}

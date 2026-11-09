@@ -116,9 +116,14 @@ var defaultExcluded = map[backend.Role]bool{
 	backend.RoleImportant: true,
 }
 
-// ReasonLeftOutByDefault is the reason for a folder that a sync leaves out
-// unless you ask for it, like spam and trash.
-const ReasonLeftOutByDefault = "left out by default"
+// Reasons why a sync leaves out a folder. They are part of the JSON output.
+const (
+	// ReasonLeftOutByDefault is for a folder that a sync leaves out unless
+	// you ask for it, like spam and trash.
+	ReasonLeftOutByDefault = "left out by default"
+	ReasonExcluded         = "left out by --exclude"
+	ReasonNotNamed         = "not named by --folder"
+)
 
 // Validate checks the patterns.
 func (f Filter) Validate() error {
@@ -136,13 +141,13 @@ func (f Filter) Validate() error {
 // Excludes reports whether a folder is left out, and why.
 func (f Filter) Excludes(folder string, role backend.Role) (bool, string) {
 	if matchesAny(f.Exclude, folder) {
-		return true, "left out by --exclude"
+		return true, ReasonExcluded
 	}
 	if len(f.Folders) > 0 {
 		if matchesAny(f.Folders, folder) {
 			return false, ""
 		}
-		return true, "not named by --folder"
+		return true, ReasonNotNamed
 	}
 	if f.gmailAllMail != "" && folder != f.gmailAllMail && !defaultExcluded[role] {
 		return true, "its mail is in " + f.gmailAllMail

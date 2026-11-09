@@ -373,7 +373,9 @@ type LastSync struct {
 	Finished time.Time `json:"finished"`
 	Outcome  string    `json:"outcome"`
 	New      int       `json:"new"`
-	Error    string    `json:"error,omitempty"`
+	// Checked names the folders the sync copied new mail from.
+	Checked []string `json:"checked"`
+	Error   string   `json:"error,omitempty"`
 }
 
 func lastSyncPath(root string, a AccountConfig) string {

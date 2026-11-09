@@ -42,8 +42,9 @@ details. `mailmd disconnect <account>` deletes the file of one account.
 
 Yes. `--folder` and `--exclude` choose folders, and `--since` leaves out older
 mail, like `--since 12m` for the last 12 months. Give these flags to `mailmd
-connect` to save them for the account. Spam and trash are left out unless you
-name them with `--folder`.
+connect` to save them for the account. On `mailmd sync`, they apply only to
+that run. Spam and trash are left out unless you name them with `--folder`.
+`mailmd list folders` shows which folders a sync copies.
 
 ## What happens when I delete a message on the server?
 

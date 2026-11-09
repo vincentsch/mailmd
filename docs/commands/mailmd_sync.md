@@ -14,14 +14,15 @@ mailmd sync [account...]
 mailmd sync
 mailmd sync work
 mailmd sync work --since 12m --exclude Newsletters
+mailmd sync work --folder Junk --dry-run
 mailmd sync --dry-run
 mailmd sync --quiet
 ```
 
 ## Flags
 
-- `--exclude` Leave out this folder and its subfolders (repeat for more)
-- `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*' (repeat for more)
+- `--exclude` Leave out this folder and its subfolders in this run. It isn't saved (repeat for more)
+- `--folder` Sync only this folder and its subfolders in this run, like INBOX or Junk. It isn't saved (repeat for more)
 - `--keep-raw` Also save each original message as an .eml file next to its Markdown file
 - `--max-message-bytes` Save only the headers of a message larger than this many bytes
 - `--out` Write to this folder for this run instead of the account's saved folder
@@ -47,4 +48,5 @@ This command makes changes. Use `--dry-run` to see what would change without cha
 ## Related commands
 
 - status
+- list folders
 - connect

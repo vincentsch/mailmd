@@ -104,7 +104,7 @@ Gmail address and how many labels it found:
 
 ```text
 Connected gmail (dana@gmail.com).
-The mailbox has 14 folders. A sync leaves out Important, Spam and Trash.
+The mailbox has 14 folders. A sync copies 11 of them and leaves out Important, Spam and Trash.
 Mail goes to ~/mail/gmail.
 
 Next: mailmd sync gmail

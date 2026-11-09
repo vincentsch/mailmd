@@ -29,7 +29,7 @@ import (
 	mdsync "github.com/vincentsch/mailmd/internal/sync"
 )
 
-func TestSyncCountsTheFoldersThatGotMail(t *testing.T) {
+func TestSyncCountsTheFoldersItChecked(t *testing.T) {
 	root := t.TempDir()
 	registerMock(t, root, "one")
 	service := mockService(3)
@@ -37,12 +37,17 @@ func TestSyncCountsTheFoldersThatGotMail(t *testing.T) {
 	service.Items["archive"] = []mock.Item{}
 	opts := mockOptions(root, service)
 	opts.HomeDir = t.TempDir()
-	// Archive is empty, so like mailmd status, the summary names one folder.
-	if _, stdout, _ := invoke(t, opts, "", "sync"); !strings.Contains(stdout, "Synced 3 new messages in 1 folder to") {
+	// Archive is empty. Both syncs checked it, so both count it, and
+	// status says that the archive's 3 messages are in 1 folder.
+	if _, stdout, _ := invoke(t, opts, "", "sync"); !strings.Contains(stdout, "mailmd checked 2 folders and saved 3 new messages to") {
 		t.Fatalf("sync:\n%s", stdout)
 	}
 	if _, stdout, _ := invoke(t, opts, "", "sync"); !strings.Contains(stdout, "one is up to date. mailmd checked 2 folders") {
 		t.Fatalf("second sync:\n%s", stdout)
+	}
+	_, stdout, _ := invoke(t, opts, "", "status", "one")
+	if !strings.Contains(stdout, "Messages   3 in 1 folder") || !strings.Contains(stdout, "Last sync  just now, completed, checked 2 folders") {
+		t.Fatalf("status:\n%s", stdout)
 	}
 }
 
@@ -56,7 +61,7 @@ func TestSyncAllAccountsIntoTheDefaultRoot(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("sync %d %s %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"one: synced 3 new messages in 1 folder to ~/mail/one in", "two: synced 3 new messages"} {
+	for _, want := range []string{"one: mailmd checked 1 folder and saved 3 new messages to ~/mail/one in", "two: mailmd checked 1 folder and saved 3 new messages"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
 		}
@@ -75,7 +80,7 @@ func TestSyncAllAccountsIntoTheDefaultRoot(t *testing.T) {
 		t.Fatalf("a quiet sync with nothing to report printed %q", stdout)
 	}
 	_, stdout, _ = invoke(t, opts, "", "status")
-	for _, want := range []string{"one (mock)", "Archive    ~/mail/one", "Messages   3 in 1 folder", "Last sync  just now, completed"} {
+	for _, want := range []string{"one (mock)", "Archive    ~/mail/one", "Messages   3 in 1 folder", "Last sync  just now, completed, checked 1 folder"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("status is missing %q:\n%s", want, stdout)
 		}
@@ -167,8 +172,9 @@ func TestSyncEndToEndOverIMAP(t *testing.T) {
 		t.Fatalf("result %+v", r)
 	}
 	server.AppendMessage("INBOX", imaptest.MessageSeed{UID: 30, Raw: []byte("Message-ID: <new@example.test>\r\nFrom: a@example.test\r\nSubject: New\r\nDate: Fri, 03 Jul 2026 09:00:00 +0000\r\n\r\nNew.\r\n")})
+	// --folder chose the folders, so the summary names them.
 	code, stdout, _ = invoke(t, opts, "", "sync", "work", "--out", out, "--folder", "INBOX", "--folder", "Work")
-	if code != 0 || !strings.Contains(stdout, "Synced 1 new message in") {
+	if code != 0 || !strings.Contains(stdout, "mailmd checked INBOX, Work and Work/Projects and saved 1 new message to") {
 		t.Fatalf("incremental %d %s", code, stdout)
 	}
 }
@@ -366,7 +372,7 @@ func TestSyncGmailWritesEachMessageOnce(t *testing.T) {
 		return gmail.Open(ctx, gmail.Config{HTTPClient: &http.Client{Transport: rewriteTransport{base: server.URL, transport: http.DefaultTransport}}})
 	}}
 	code, stdout, stderr := invoke(t, opts, "", "sync", "gmail", "--out", out)
-	if code != 0 || !strings.Contains(stdout, "Synced 2 new messages to ") {
+	if code != 0 || !strings.Contains(stdout, "mailmd checked all mail and saved 2 new messages to ") {
 		t.Fatalf("%d %s %s", code, stdout, stderr)
 	}
 	var files []string
@@ -406,7 +412,7 @@ func TestGmailSummaryDoesNotCountItsOneScopeAsAFolder(t *testing.T) {
 		Folders: []mdsync.FolderResult{{Path: mdsync.AllMailPath, Status: "synced", New: 13}}}
 	var out bytes.Buffer
 	renderSyncResult(&out, r, "/home/dana", false)
-	if want := "Synced 13 new messages to ~/mail/personal in 7 s.\n"; out.String() != want {
+	if want := "mailmd checked all mail and saved 13 new messages to ~/mail/personal in 7 s.\n"; out.String() != want {
 		t.Fatalf("got %q, want %q", out.String(), want)
 	}
 	r.New, r.Folders[0].New = 0, 0

@@ -65,7 +65,7 @@ mail will go:
 
 ```text
 Connected fastmail (you@fastmail.com).
-The mailbox has 5 folders. A sync leaves out Spam and Trash.
+The mailbox has 5 folders. A sync copies 3 of them and leaves out Spam and Trash.
 Mail goes to ~/mail/fastmail.
 
 Next: mailmd sync fastmail
@@ -113,7 +113,7 @@ Syncing fastmail to ~/mail/fastmail
   INBOX                    412 new
   Sent                     118 new
   Left out: Spam and Trash. Use --folder to sync them.
-Synced 624 new messages in 3 folders to ~/mail/fastmail in 12 s.
+mailmd checked 3 folders and saved 624 new messages to ~/mail/fastmail in 12 s.
 ```
 
 The first sync of a large mailbox can take a while. You can stop it with
@@ -135,9 +135,16 @@ tells you about it.
 | Also save the original message | `--keep-raw` |
 | The text part instead of converted HTML | `--prefer-text` |
 
-These flags work on `mailmd sync` for one run. Give them to `mailmd connect`
-to save them for the account. To change them later, run the same connect
-command again with the new flags.
+These flags work on `mailmd sync` for one run, and mailmd doesn't save them.
+On `sync`, `--folder` and `--exclude` replace the ones saved with the account
+for that run. Give the flags to `mailmd connect` to save them for the
+account. To change them later, run the same connect command again with the
+new flags.
+
+`--folder` also syncs a folder that is left out by default. So
+`mailmd sync fastmail --folder Spam` copies the spam folder once, and the
+next normal sync leaves it out again. Add `--dry-run` to see first how many
+new messages a sync would save. A dry run writes nothing.
 
 A folder name also matches its subfolders, so `--exclude Work` also leaves
 out `Work/Clients`. Names are not case sensitive. If a `--folder` matches no

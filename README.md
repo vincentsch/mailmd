@@ -144,7 +144,7 @@ mailmd sync
 ```
 
 ```text
-Synced 624 new messages in 8 folders to ~/mail/work in 1 s.
+mailmd checked 4 folders and saved 624 new messages to ~/mail/work in 12 s.
 ```
 
 The mail goes to `~/mail/<account>`, unless you chose another folder with
@@ -156,7 +156,9 @@ mailmd leaves out spam and trash unless you ask for them with `--folder`.
 For a Gmail address over IMAP, it syncs only `[Gmail]/All Mail`. You get one
 copy of every message, including mail you archived, but no separate Inbox or
 Sent folder ([details](docs/imap.md#gmail-over-imap)). You can pick folders
-with `--folder` and `--exclude`, and leave out older mail with `--since`:
+with `--folder` and `--exclude`, and leave out older mail with `--since`. On
+`mailmd sync` these flags apply to one run. Give them to `mailmd connect` to
+save them for the account:
 
 ```sh
 mailmd sync work --since 12m --exclude Newsletters
@@ -181,13 +183,15 @@ A sync copies 4 of these 6 folders.
 To copy a folder that is left out by default, name it for one sync, like: mailmd sync work --folder Spam
 ```
 
-`mailmd status` shows what is in each archive and when it was last synced:
+`mailmd status` shows what is in each archive and when it was last synced.
+Here the archive has mail in 3 folders. The sync checked 4, because Drafts
+is empty:
 
 ```text
 work (IMAP, dana@fastmail.com)
   Archive    ~/mail/work
-  Messages   624 in 8 folders
-  Last sync  2 minutes ago, completed, 624 new
+  Messages   624 in 3 folders
+  Last sync  2 minutes ago, completed, checked 4 folders, 624 new
 ```
 
 To sync on a schedule, let your system run `mailmd sync --quiet` every few

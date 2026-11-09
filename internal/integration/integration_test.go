@@ -542,3 +542,38 @@ func TestCAFileIsSavedWithTheAccount(t *testing.T) {
 		})
 	}
 }
+
+// Junk is left out by default. A dry run with --folder Junk counts its new
+// mail and writes nothing, and the next sync still leaves it out.
+func TestDryRunOfALeftOutFolderCountsItsMail(t *testing.T) {
+	for _, s := range servers(t) {
+		t.Run(s.name, func(t *testing.T) {
+			u := user(t)
+			msgs := demo.Messages()[:3]
+			msgs[0].Folder, msgs[1].Folder, msgs[2].Folder = "INBOX", "Junk", "Junk"
+			seed(t, s, u, msgs)
+			r := newRun(t, s)
+			r.connect(s, u)
+			if result := r.sync().Accounts[0]; result.New != 1 {
+				t.Fatalf("sync: %+v", result)
+			}
+			if result := r.sync("--folder", "Junk", "--dry-run").Accounts[0]; result.New != 2 || !result.DryRun {
+				t.Fatalf("dry run of Junk: %+v", result)
+			}
+			if _, err := os.Stat(filepath.Join(r.out, "work", "Junk")); !os.IsNotExist(err) {
+				t.Fatalf("the dry run wrote Junk: %v", err)
+			}
+			if result := r.sync().Accounts[0]; result.New != 0 {
+				t.Fatalf("sync after the dry run: %+v", result)
+			}
+			code, stdout, _ := r.mailmd("", "list", "folders", "work", "--json")
+			var list cli.FolderList
+			_ = json.Unmarshal([]byte(stdout), &list)
+			for _, f := range list.Folders {
+				if f.Path == "Junk" && (code != 0 || f.Included || f.Reason != "left out by default" || f.Messages == nil || *f.Messages != 2) {
+					t.Fatalf("Junk in list folders: %d %+v", code, f)
+				}
+			}
+		})
+	}
+}

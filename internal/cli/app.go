@@ -196,17 +196,20 @@ var specs = []spec{
 		short: "Copy new mail into the archive",
 		long: "Copy the new mail of your connected accounts into Markdown files. Without account names, mailmd syncs all accounts. " +
 			"Each run fetches only what is new since the last one. If you stop a sync with Ctrl-C, the files saved so far stay.\n\n" +
-			"Spam and trash are left out unless you name them with --folder. For Gmail over IMAP, mailmd syncs only [Gmail]/All Mail, which has every message once.\n\n" +
+			"Spam and trash are left out by default. For Gmail over IMAP, mailmd syncs only [Gmail]/All Mail, which has every message once. mailmd list folders shows which folders a sync copies.\n\n" +
+			"--folder and --exclude apply only to this run, and they replace the ones saved with the account. To save them, give them to mailmd connect. --folder also syncs a folder that is left out by default, so --folder Junk syncs Junk once.\n\n" +
+			"With --dry-run, mailmd says how many new messages it would save and writes nothing.\n\n" +
 			"A message that was too large is saved with its headers only. When you raise --max-message-bytes above its size, the next sync fetches the full message. " +
 			"With --quiet, it prints only warnings and errors.",
 		examples: []string{
 			"mailmd sync",
 			"mailmd sync work",
 			"mailmd sync work --since 12m --exclude Newsletters",
+			"mailmd sync work --folder Junk --dry-run",
 			"mailmd sync --dry-run",
 			"mailmd sync --quiet",
 		},
-		related: []string{"status", "connect"},
+		related: []string{"status", "list folders", "connect"},
 		schema:  "mailmd-sync/1",
 		modes:   allModes,
 		mutates: true,

@@ -20,8 +20,8 @@ mailmd connect gmail --account personal
 
 - `--account` Name for this account, also used as its archive folder (default: gmail)
 - `--client-secret` The OAuth client JSON file you downloaded from Google Cloud (not needed to connect an account again)
-- `--exclude` Leave out this folder and its subfolders (repeat for more)
-- `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*' (repeat for more)
+- `--exclude` Leave out this folder and its subfolders. mailmd saves it with the account (repeat for more)
+- `--folder` Sync only this folder and its subfolders, like INBOX or 'Work/*'. mailmd saves it with the account (repeat for more)
 - `--keep-raw` Also save each original message as an .eml file next to its Markdown file
 - `--no-browser` Don't open a browser, only print the sign-in address
 - `--out` Folder for the archive (default: ~/mail)

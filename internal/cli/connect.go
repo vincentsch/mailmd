@@ -57,7 +57,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("ca-file", "", "PEM file with the certificate of your server's own certificate authority. mailmd trusts it in addition to the system's certificates and saves it with the account")
 		c.Flags().Bool("password-stdin", false, "Read the password from the first line of standard input")
 		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
-		addFilterFlags(c)
+		addFilterFlags(c, true)
 	}
 	imapCmd.Run = m.connectIMAP
 
@@ -67,7 +67,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: gmail)")
 		c.Flags().Bool("no-browser", false, "Don't open a browser, only print the sign-in address")
 		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
-		addFilterFlags(c)
+		addFilterFlags(c, true)
 	}
 	gmailCmd.Run = m.connectGmail
 
@@ -77,7 +77,7 @@ func (m module) connectCommands(commands map[string]*rg.Command) {
 		c.Flags().String("tenant", "common", "Who can sign in: common, organizations, consumers, or your tenant ID")
 		c.Flags().String("account", "", "Name for this account, also used as its archive folder (default: outlook)")
 		c.Flags().String("out", "", "Folder for the archive (default: ~/mail)")
-		addFilterFlags(c)
+		addFilterFlags(c, true)
 	}
 	outlookCmd.Run = m.connectOutlook
 }
@@ -594,8 +594,12 @@ func (m module) writeConnect(f *rg.Factory, c *cobra.Command, a accounts.Account
 		}
 		if result.Folders > 0 {
 			line := fmt.Sprintf("The mailbox has %s.", plural(result.Folders, "folder", "folders"))
-			if len(result.LeftOut) > 0 && allMail == "" {
-				line += fmt.Sprintf(" A sync leaves out %s.", joinNames(result.LeftOut))
+			switch {
+			case allMail != "":
+			case len(result.LeftOut) == 0:
+				line += " A sync copies all of them."
+			default:
+				line += fmt.Sprintf(" A sync copies %d of them and leaves out %s.", result.Folders-len(result.LeftOut), joinNames(result.LeftOut))
 			}
 			fmt.Fprintln(w, line)
 		}
