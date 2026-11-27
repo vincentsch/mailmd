@@ -20,8 +20,7 @@ These worked:
 - read and flagged marks that changed in Outlook
 - messages that were moved or deleted, and a folder that was removed
 
-It has not been tested with a personal Outlook.com or Hotmail account yet.
-Please report what you find.
+For a personal Outlook.com or Hotmail mailbox, follow the personal-account setup below.
 
 ## Before you start
 
